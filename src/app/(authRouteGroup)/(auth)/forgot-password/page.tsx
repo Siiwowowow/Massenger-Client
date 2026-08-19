@@ -1,5 +1,5 @@
-// src/app/(commonLayout)/(auth)/forgot-password/page.tsx
-import ForgotPasswordForm from "@/components/Auth/ForgotPasswordForm";
+// src/app/(authRouteGroup)/(auth)/forgot-password/page.tsx
+import ForgotPasswordForm from "@/features/auth/components/ForgotPasswordForm";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {

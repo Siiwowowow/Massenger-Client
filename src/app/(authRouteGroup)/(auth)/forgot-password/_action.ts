@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// src/app/(commonLayout)/(auth)/forgot-password/_action.ts
+// src/app/(authRouteGroup)/(auth)/forgot-password/_action.ts
 "use server";
 
-import { forgotPasswordZodSchema } from "@/zod/auth.validation";
+import { forgotPasswordZodSchema } from "@/features/auth/schemas/auth.schema";
 
 
 const BASE_API_URL = process.env.NEXT_PUBLIC_API_BASE_URL;

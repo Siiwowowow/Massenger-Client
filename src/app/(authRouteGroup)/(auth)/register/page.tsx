@@ -1,5 +1,5 @@
-// src/app/(commonLayout)/(auth)/register/page.tsx
-import RegisterForm from "@/components/Auth/RegisterForm";
+// src/app/(authRouteGroup)/(auth)/register/page.tsx
+import RegisterForm from "@/features/auth/components/RegisterForm";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {

@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// src/app/(commonLayout)/(auth)/reset-password/_action.ts
+// src/app/(authRouteGroup)/(auth)/reset-password/_action.ts
 "use server";
 
-import { resetPasswordZodSchema } from "@/zod/auth.validation";
+import { resetPasswordZodSchema } from "@/features/auth/schemas/auth.schema";
 
 const BASE_API_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 

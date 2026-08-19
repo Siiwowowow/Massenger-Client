@@ -1,9 +1,9 @@
 //src/proxy.ts
 import { NextRequest, NextResponse } from "next/server";
-import { getDefaultDashboardRoute, getRouteOwner, isAuthRoute, UserRole } from "./lib/authUtils";
-import { jwtUtils } from "./lib/jwtUtils";
-import { isTokenExpiringSoon } from "./lib/tokenUtils";
-import { getNewTokensWithRefreshToken, getUserInfo } from "./services/auth.services";
+import { getDefaultDashboardRoute, getRouteOwner, isAuthRoute, UserRole } from "@/lib/auth/authUtils";
+import { jwtUtils } from "@/lib/auth/jwtUtils";
+import { isTokenExpiringSoon } from "@/lib/auth/tokenUtils";
+import { getNewTokensWithRefreshToken, getUserInfo } from "@/features/auth/services/auth.services";
 
 async function refreshTokenMiddleware(refreshToken: string): Promise<boolean> {
   try {
@@ -139,7 +139,7 @@ export async function proxy(request: NextRequest) {
       return NextResponse.next();
     }
 
-    // ✅ Rule 7: Role based access control for ADMIN, SELLER, CUSTOMER
+    // ✅ Rule 7: Role based access control for ADMIN and USER
     if (routeOwner === "ADMIN") {
       // SUPER_ADMIN and ADMIN both can access admin routes
       if (userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
@@ -147,15 +147,9 @@ export async function proxy(request: NextRequest) {
       }
     }
 
-    if (routeOwner === "SELLER") {
-      if (userRole !== "SELLER") {
-        return NextResponse.redirect(new URL(getDefaultDashboardRoute(userRole as UserRole), request.url));
-      }
-    }
-
-    if (routeOwner === "CUSTOMER") {
-      if (userRole !== "CUSTOMER") {
-        return NextResponse.redirect(new URL(getDefaultDashboardRoute(userRole as UserRole), request.url));
+    if (routeOwner === "USER") {
+      if (userRole !== "USER" && userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+        return NextResponse.redirect(new URL(getDefaultDashboardRoute(userRole as unknown as UserRole), request.url));
       }
     }
 

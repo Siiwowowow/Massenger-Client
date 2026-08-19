@@ -1,36 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PrimarySetup — Production-Ready Next.js Starter Template
 
-## Getting Started
+A modern, scalable Next.js App Router starter template designed for production web applications with a clean feature-based architecture.
 
-First, run the development server:
+## 🚀 Tech Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Framework**: Next.js 16 (App Router) & React 19
+- **Language**: TypeScript (Strict Mode)
+- **Styling**: Tailwind CSS v4 & shadcn/ui
+- **Server State**: TanStack Query
+- **Global Client State**: Redux Toolkit (with Typed Hooks)
+- **HTTP Client**: Axios with centralized error parsing and credentials
+- **Validation**: Zod schema validation
+- **Authentication**: Cookie-based HttpOnly tokens (JWT)
+
+---
+
+## 📁 Architecture Overview
+
+```
+src/
+├── app/              # Next.js App Router pages, layouts, errors, route groups
+├── config/           # Centralized environment validation (Zod)
+├── constants/        # Application constants & route definitions
+├── features/         # Feature modules (components, services, schemas, types, store)
+│   ├── auth/         # Authentication domain
+│   └── user/         # User domain
+├── components/       # Shared presentation layer
+│   ├── layout/       # Sidebar & shell layouts
+│   ├── shared/       # Reusable components & async UI states (Loading, Empty, Error)
+│   └── ui/           # shadcn/ui primitives
+├── hooks/            # Global reusable utility hooks
+├── lib/              # Infrastructure utilities (api, axios, auth, cookies, logger)
+├── providers/        # Application-level providers (Query, Redux, Auth)
+├── types/            # Truly global types & API response structures
+└── proxy.ts          # Edge/middleware session & route protection
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🔑 State Management Separation
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **TanStack Query**: Owns server state, data fetching, mutations, caching, and server synchronization.
+2. **Redux Toolkit**: Owns global mutable client UI state (modals, client filters, UI drawers).
+3. **Authentication**: Managed via secure HttpOnly cookies. Tokens are **never** stored in Redux or `localStorage`.
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 🛠️ Environment Configuration
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Copy `.env.example` to `.env` and fill in the values:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+cp .env.example .env
+```
 
-## Deploy on Vercel
+| Variable | Description | Exposed to Browser |
+| :--- | :--- | :--- |
+| `NEXT_PUBLIC_API_BASE_URL` | Backend API endpoint | Yes |
+| `JWT_ACCESS_SECRET` | Secret for token verification in proxy | No (Server only) |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 💻 Getting Started
+
+```bash
+# Install dependencies
+pnpm install
+
+# Run development server
+pnpm dev
+
+# Check TypeScript types
+npx tsc --noEmit
+
+# Run production build
+pnpm build
+```

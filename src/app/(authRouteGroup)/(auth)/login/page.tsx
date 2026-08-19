@@ -1,4 +1,4 @@
-import LoginForm from "@/components/Auth/LoginForm";
+import LoginForm from "@/features/auth/components/LoginForm";
 
 interface LoginParams {
   searchParams: Promise<{ redirect?: string; email?: string }>;

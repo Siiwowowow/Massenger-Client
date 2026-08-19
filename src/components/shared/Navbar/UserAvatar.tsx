@@ -1,6 +1,6 @@
 "use client";
 
-import { useUser } from "@/hooks/useUser";
+import { useUser } from "@/features/user/hooks/useUser";
 import { useRef, useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -12,7 +12,7 @@ import {
   AvatarFallback,
   AvatarBadge,
 } from "@/components/ui/avatar";
-import { removeProfilePhotoService, updateMyProfileService } from "@/services/user.services";
+import { removeProfilePhotoService, updateMyProfileService } from "@/features/user/services/user.services";
 
 const getInitials = (name?: string, email?: string): string => {
   if (name) {

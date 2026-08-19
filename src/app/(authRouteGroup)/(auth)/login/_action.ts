@@ -4,16 +4,16 @@
 import {
   getRedirectAfterLogin,
   UserRole,
-} from "@/lib/authUtils";
+} from "@/lib/auth/authUtils";
 
 import { httpClient } from "@/lib/axios/httpClient";
-import { setTokenInCookies } from "@/lib/tokenUtils";
+import { setTokenInCookies } from "@/lib/auth/tokenUtils";
 import { ApiErrorResponse } from "@/types/api.types";
-import { ILoginResponse } from "@/zod/auth.types";
+import { ILoginResponse } from "@/features/auth/types/auth.types";
 import {
   ILoginPayload,
   loginZodSchema,
-} from "@/zod/auth.validation";
+} from "@/features/auth/schemas/auth.schema";
 
 import { redirect } from "next/navigation";
 

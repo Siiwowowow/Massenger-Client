@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect } from "react";
+import { logger } from "@/lib/logger/logger";
+import { Button } from "@/components/ui/button";
+import { AlertCircle, RotateCcw, Home } from "lucide-react";
+import Link from "next/link";
 
-export default function Error({
+export default function GlobalError({
   error,
   reset,
 }: {
@@ -10,50 +14,41 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error(error);
+    logger.error("Unhandled root error:", error);
   }, [error]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white p-4">
-      <div className="max-w-md w-full text-center">
-        {/* Simple Icon */}
-        <div className="mb-8">
-          <div className="w-24 h-24 mx-auto bg-gray-100 rounded-full flex items-center justify-center">
-            <span className="text-5xl">⚠️</span>
-          </div>
+    <div className="min-h-[70vh] flex items-center justify-center p-4">
+      <div className="max-w-md w-full text-center space-y-6">
+        <div className="mx-auto w-16 h-16 bg-destructive/10 rounded-2xl flex items-center justify-center text-destructive">
+          <AlertCircle className="w-8 h-8" />
         </div>
 
-        {/* Error Message */}
-        <h1 className="text-4xl font-light text-gray-900 mb-2">
-          500
-        </h1>
-        <h2 className="text-xl font-semibold text-gray-800 mb-4">
-          Something went wrong
-        </h2>
-        <p className="text-gray-500 mb-8">
-          {error.message || "An unexpected error occurred. Please try again."}
-        </p>
-
-        {/* Action Buttons */}
-        <div className="space-y-3">
-          <button
-            onClick={() => reset()}
-            className="w-full px-6 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
-          >
-            Try again
-          </button>
-          <button
-            onClick={() => window.location.reload()}
-            className="w-full px-6 py-3 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
-          >
-            Reload page
-          </button>
+        <div className="space-y-2">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            Something went wrong
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {error.message || "An unexpected application error occurred."}
+          </p>
         </div>
 
-        {/* Error ID for support */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <Button onClick={() => reset()} className="w-full sm:w-auto gap-2">
+            <RotateCcw className="w-4 h-4" />
+            Try Again
+          </Button>
+          <Button variant="outline" asChild className="w-full sm:w-auto gap-2">
+            <Link href="/">
+              <Home className="w-4 h-4" />
+              Return Home
+            </Link>
+          </Button>
+        </div>
+
         {error.digest && (
-          <p className="mt-6 text-xs text-gray-400">
-            Error reference: {error.digest}
+          <p className="text-xs text-muted-foreground font-mono">
+            Error digest: {error.digest}
           </p>
         )}
       </div>

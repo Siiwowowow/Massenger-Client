@@ -3,13 +3,15 @@
 import DesktopNav from "./DesktopNav";
 import MobileNav from "./MobileNav";
 import type { NavbarProps } from "./types";
-import { Home, Info, Phone } from "lucide-react";
+import { Home, Sparkles, Cpu, Layers, BookOpen } from "lucide-react";
 
-// ✅ Public Links
+// ✅ Public Starter Links
 const defaultPublicLinks = [
   { label: "Home", href: "/", icon: Home },
-  { label: "About", href: "/about", icon: Info },
-  { label: "Contact", href: "/contact", icon: Phone },
+  { label: "Features", href: "/#features", icon: Sparkles },
+  { label: "Tech Stack", href: "/#tech-stack", icon: Cpu },
+  { label: "UI Kit", href: "/#components", icon: Layers },
+  { label: "Quickstart", href: "/#quickstart", icon: BookOpen },
 ];
 
 export default function Navbar({}: NavbarProps) {

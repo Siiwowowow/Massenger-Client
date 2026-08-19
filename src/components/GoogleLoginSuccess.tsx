@@ -4,19 +4,20 @@
 import { useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { useUser } from "@/hooks/useUser";
+import { useUser } from "@/features/user/hooks/useUser";
 
 export function GoogleLoginSuccess() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { setUser } = useUser(); // ✅ ADD THIS
+  const { setUser } = useUser();
   const shownRef = useRef(false);
 
   useEffect(() => {
+    const loginStatus = searchParams.get("login");
+    if (!loginStatus) return; // ✅ Do not run or replace route if no login query param
+
     if (shownRef.current) return;
     shownRef.current = true;
-
-    const loginStatus = searchParams.get("login");
 
     const fetchUser = async () => {
       try {
@@ -28,7 +29,7 @@ export function GoogleLoginSuccess() {
         );
         const data = await res.json();
         if (data?.data) {
-          setUser(data.data); // 🔥 THIS FIXES EVERYTHING
+          setUser(data.data);
         }
       } catch (err) {
         console.log(err);
@@ -42,7 +43,7 @@ export function GoogleLoginSuccess() {
         });
       }, 100);
 
-      fetchUser(); // 🔥 REFRESH USER HERE
+      fetchUser();
     }
 
     if (loginStatus === "error") {
@@ -57,4 +58,4 @@ export function GoogleLoginSuccess() {
   }, [searchParams, router, setUser]);
 
   return null;
-}
+}

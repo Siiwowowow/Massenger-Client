@@ -1,12 +1,10 @@
 //src/providers/AuthProvider.tsx
 "use client";
 
-import { createContext, useContext, useState } from "react";
-import { logoutUser } from "@/services/auth.services";
-import { useRouter } from "next/navigation";
-import { ICurrentUser } from "@/types/user.types";
+import { createContext, useContext, useState, useMemo, useCallback } from "react";
+import { logoutUser } from "@/features/auth/services/auth.services";
+import { ICurrentUser } from "@/features/user/types/user.types";
 
-// ✅ আলাদা CurrentUser বাদ দিয়ে ICurrentUser ব্যবহার করুন
 interface AuthContextType {
     user: ICurrentUser | null;
     setUser: (user: ICurrentUser | null) => void;
@@ -20,19 +18,24 @@ export function AuthProvider({
     initialUser 
 }: { 
     children: React.ReactNode; 
-    initialUser: ICurrentUser | null; // ✅ type fixed
+    initialUser: ICurrentUser | null;
 }) {
     const [user, setUser] = useState<ICurrentUser | null>(initialUser);
-    const router = useRouter();
 
-    const logout = async () => {
+    const logout = useCallback(async () => {
         setUser(null);
         await logoutUser();
         window.location.href = "/login";
-    };
+    }, []);
+
+    const contextValue = useMemo(() => ({
+        user,
+        setUser,
+        logout,
+    }), [user, logout]);
 
     return (
-        <AuthContext.Provider value={{ user, setUser, logout }}>
+        <AuthContext.Provider value={contextValue}>
             {children}
         </AuthContext.Provider>
     );
@@ -44,4 +47,4 @@ export const useAuth = () => {
         throw new Error("useAuth must be used within an AuthProvider");
     }
     return context;
-};
+};

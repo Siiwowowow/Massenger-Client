@@ -1,7 +1,7 @@
 "use client";
 
-import { useUser } from "@/hooks/useUser";
-import { updateMyProfileService, removeProfilePhotoService } from "@/services/user.services";
+import { useUser } from "@/features/user/hooks/useUser";
+import { updateMyProfileService, removeProfilePhotoService } from "@/features/user/services/user.services";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";

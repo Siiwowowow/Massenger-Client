@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// src/app/(commonLayout)/(auth)/verify-email/_action.ts
+// src/app/(authRouteGroup)/(auth)/verify-email/_action.ts
 "use server";
 
-import { verifyEmailZodSchema } from "@/zod/auth.validation";
+import { verifyEmailZodSchema } from "@/features/auth/schemas/auth.schema";
 
 const BASE_API_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 

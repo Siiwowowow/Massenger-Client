@@ -1,5 +1,5 @@
-// src/app/(commonLayout)/(auth)/reset-password/page.tsx
-import ResetPasswordForm from "@/components/Auth/ResetPasswordForm";
+// src/app/(authRouteGroup)/(auth)/reset-password/page.tsx
+import ResetPasswordForm from "@/features/auth/components/ResetPasswordForm";
 import { Metadata } from "next";
 import { Suspense } from "react";
 

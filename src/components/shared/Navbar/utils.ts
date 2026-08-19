@@ -5,10 +5,8 @@ export const getDashboardRoute = (role?: string): string => {
     case "SUPER_ADMIN":
     case "ADMIN":
       return "/admin/dashboard";
-    case "SELLER":
-      return "/seller/dashboard";
-    case "CUSTOMER":
-      return "/dashboard";
+    case "USER":
+      return "/user/dashboard";
     default:
       return "/";
   }
@@ -26,9 +24,3 @@ export const isActivePath = (pathname: string, href: string): boolean => {
   if (href === "/") return pathname === "/";
   return pathname.startsWith(href);
 };
-
-export const formatPrice = (price: number): string =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(price);
-
-export const getCartTotal = (items: { price: number; quantity: number }[]): number =>
-  items.reduce((sum, item) => sum + item.price * item.quantity, 0);

@@ -1,5 +1,5 @@
-// src/app/(commonLayout)/(auth)/verify-email/page.tsx
-import VerifyEmailForm from "@/components/Auth/VerifyEmailForm";
+// src/app/(authRouteGroup)/(auth)/verify-email/page.tsx
+import VerifyEmailForm from "@/features/auth/components/VerifyEmailForm";
 import { Metadata } from "next";
 import { Suspense } from "react";
 

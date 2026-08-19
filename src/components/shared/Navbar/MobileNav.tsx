@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Menu, X, LayoutDashboard } from "lucide-react";
-import { useUser } from "@/hooks/useUser";
+import { useUser } from "@/features/user/hooks/useUser";
 import Logo from "./Logo";
 import AuthButtons from "./AuthButtons";
 import UserAvatar from "./UserAvatar";
 import { getDashboardRoute } from "./utils";
 import type { NavLink } from "./types";
-import NavLinks from "./Navlinks ";
+import NavLinks from "./NavLinks";
 
 interface Props {
   publicLinks: NavLink[];
@@ -21,12 +21,12 @@ export default function MobileNav({
   const [open, setOpen] = useState(false);
   const dashboardRoute = getDashboardRoute(user?.role);
 
-  const allLinks: NavLink[] = [
+  const allLinks: NavLink[] = useMemo(() => [
     ...publicLinks,
     ...(user
       ? [{ label: "Dashboard", href: dashboardRoute, icon: LayoutDashboard }]
       : []),
-  ];
+  ], [publicLinks, user, dashboardRoute]);
 
   const close = () => setOpen(false);
 
