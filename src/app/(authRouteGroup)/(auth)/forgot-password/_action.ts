@@ -26,12 +26,13 @@ export async function forgotPasswordAction(payload: { email: string }) {
       body: JSON.stringify({ email: payload.email }),
     });
 
-    const data = await res.json();
+    const text = await res.text();
+    const data = text && text.trim() ? JSON.parse(text) : {};
 
     if (!res.ok) {
       return {
         success: false,
-        message: data.message || "Failed to send reset code",
+        message: data?.message || "Failed to send reset code",
       };
     }
 

@@ -14,6 +14,16 @@ export interface IRefreshTokenData {
     token: string;
 }
 
+async function safeJsonParse(res: Response) {
+    try {
+        const text = await res.text();
+        if (!text || !text.trim()) return null;
+        return JSON.parse(text);
+    } catch {
+        return null;
+    }
+}
+
 export async function getNewTokensWithRefreshToken(refreshToken: string): Promise<IRefreshTokenData | null> {
     try {
         const res = await fetch(`${BASE_API_URL}/auth/refresh-token`, {
@@ -28,8 +38,10 @@ export async function getNewTokensWithRefreshToken(refreshToken: string): Promis
             return null;
         }
 
-        const { data } = await res.json();
-        const { accessToken, refreshToken: newRefreshToken, token } = data;
+        const body = await safeJsonParse(res);
+        if (!body?.data) return null;
+
+        const { accessToken, refreshToken: newRefreshToken, token } = body.data;
 
         // Still persist to cookies for the next server-side request (non-middleware)
         if (accessToken) await setTokenInCookies("accessToken", accessToken);
@@ -70,8 +82,10 @@ async function refreshAndGetTokens(
 
         if (!res.ok) return null;
 
-        const { data } = await res.json();
-        const { accessToken, refreshToken: newRefreshToken, token } = data;
+        const body = await safeJsonParse(res);
+        if (!body?.data) return null;
+
+        const { accessToken, refreshToken: newRefreshToken, token } = body.data;
 
         if (!accessToken) return null;
 
@@ -89,7 +103,13 @@ async function refreshAndGetTokens(
 
 export const getUserInfo = cache(async () => {
     try {
-        const cookieStore = await cookies();
+        let cookieStore;
+        try {
+            cookieStore = await cookies();
+        } catch {
+            return null;
+        }
+
         let accessToken = cookieStore.get("accessToken")?.value;
         const refreshToken = cookieStore.get("refreshToken")?.value;
 
@@ -108,16 +128,14 @@ export const getUserInfo = cache(async () => {
             return null;
         }
 
-        // Send ONLY the accessToken — this forces the backend checkAuth
-        // middleware to use the JWT verification path, which is reliable.
-        // Sending better-auth.session_token would trigger auth.api.getSession()
-        // which can fail if the session has expired in the DB, causing 401
-        // even when the JWT is perfectly valid.
+        // Send accessToken in both Cookie and Authorization header
         let res = await fetch(`${BASE_API_URL}/auth/me`, {
             method: "GET",
+            cache: "no-store",
             headers: {
                 "Content-Type": "application/json",
-                Cookie: `accessToken=${accessToken}`
+                Cookie: `accessToken=${accessToken}`,
+                Authorization: `Bearer ${accessToken}`
             }
         });
 
@@ -127,21 +145,22 @@ export const getUserInfo = cache(async () => {
             if (newTokens) {
                 res = await fetch(`${BASE_API_URL}/auth/me`, {
                     method: "GET",
+                    cache: "no-store",
                     headers: {
                         "Content-Type": "application/json",
-                        Cookie: `accessToken=${newTokens.accessToken}`
+                        Cookie: `accessToken=${newTokens.accessToken}`,
+                        Authorization: `Bearer ${newTokens.accessToken}`
                     }
                 });
             }
         }
 
         if (!res.ok) {
-            console.error("Failed to fetch user info:", res.status, res.statusText);
             return null;
         }
 
-        const { data } = await res.json();
-        return data;
+        const body = await safeJsonParse(res);
+        return body?.data ?? body ?? null;
     } catch (error) {
         console.error("Error fetching user info:", error);
         return null;
@@ -160,3 +179,4 @@ export async function logoutUser() {
         return false;
     }
 }
+

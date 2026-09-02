@@ -1,7 +1,7 @@
 //src/providers/AuthProvider.tsx
 "use client";
 
-import { createContext, useContext, useState, useMemo, useCallback } from "react";
+import { createContext, useContext, useState, useEffect, useMemo, useCallback } from "react";
 import { logoutUser } from "@/features/auth/services/auth.services";
 import { ICurrentUser } from "@/features/user/types/user.types";
 
@@ -21,6 +21,10 @@ export function AuthProvider({
     initialUser: ICurrentUser | null;
 }) {
     const [user, setUser] = useState<ICurrentUser | null>(initialUser);
+
+    useEffect(() => {
+        setUser(initialUser);
+    }, [initialUser]);
 
     const logout = useCallback(async () => {
         setUser(null);
@@ -47,4 +51,6 @@ export const useAuth = () => {
         throw new Error("useAuth must be used within an AuthProvider");
     }
     return context;
-};
+};
+
+

@@ -34,12 +34,13 @@ export async function resetPasswordAction(payload: {
       }),
     });
 
-    const data = await res.json();
+    const text = await res.text();
+    const data = text && text.trim() ? JSON.parse(text) : {};
 
     if (!res.ok) {
       return {
         success: false,
-        message: data.message || "Failed to reset password",
+        message: data?.message || "Failed to reset password",
       };
     }
 
@@ -66,12 +67,13 @@ export async function resendResetOtpAction(email: string) {
       body: JSON.stringify({ email }),
     });
 
-    const data = await res.json();
+    const text = await res.text();
+    const data = text && text.trim() ? JSON.parse(text) : {};
 
     if (!res.ok) {
       return {
         success: false,
-        message: data.message || "Failed to resend code",
+        message: data?.message || "Failed to resend code",
       };
     }
 

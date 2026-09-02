@@ -6,6 +6,16 @@ import { cookies } from "next/headers";
 
 const BASE_API_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
+async function safeJsonParse(res: Response) {
+  try {
+    const text = await res.text();
+    if (!text || !text.trim()) return null;
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
 // ✅ Profile photo upload / name update
 export async function updateMyProfileService(formData: FormData) {
   try {
@@ -24,18 +34,18 @@ export async function updateMyProfileService(formData: FormData) {
       body: formData,
     });
 
-    const data = await res.json();
+    const data = await safeJsonParse(res);
 
     if (!res.ok) {
       return {
         success: false,
-        message: data.message || "Update failed",
+        message: data?.message || "Update failed",
       };
     }
 
     return {
       success: true,
-      data: data.data,
+      data: data?.data,
     };
   } catch (error: any) {
     console.error("Profile update error:", error);
@@ -63,12 +73,12 @@ export async function removeProfilePhotoService() {
       },
     });
 
-    const data = await res.json();
+    const data = await safeJsonParse(res);
 
     if (!res.ok) {
       return {
         success: false,
-        message: data.message || "Failed to remove photo",
+        message: data?.message || "Failed to remove photo",
       };
     }
 
@@ -81,3 +91,4 @@ export async function removeProfilePhotoService() {
     };
   }
 }
+

@@ -13,12 +13,13 @@ export async function registerAction(formData: FormData) {
       credentials: "include",
     });
 
-    const data = await res.json();
+    const text = await res.text();
+    const data = text && text.trim() ? JSON.parse(text) : {};
 
     if (!res.ok) {
       return {
         success: false,
-        message: data.message || "Registration failed",
+        message: data?.message || "Registration failed",
       };
     }
 

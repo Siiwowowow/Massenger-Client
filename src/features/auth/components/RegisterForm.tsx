@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Label } from "@/components/ui/label";
 import { Camera, X, Eye, EyeOff, User, Mail, Lock, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import SocialLogin from "@/components/shared/socialLogin/SocialLogin";
+import SocialLogin from "@/components/shared/socialLogin/socialLogin";
 
 const RegisterForm = () => {
   const router = useRouter();

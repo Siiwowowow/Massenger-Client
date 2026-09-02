@@ -27,7 +27,10 @@ export function GoogleLoginSuccess() {
             credentials: "include",
           }
         );
-        const data = await res.json();
+        if (!res.ok) return;
+        const text = await res.text();
+        if (!text || !text.trim()) return;
+        const data = JSON.parse(text);
         if (data?.data) {
           setUser(data.data);
         }

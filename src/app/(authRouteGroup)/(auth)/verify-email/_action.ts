@@ -29,12 +29,13 @@ export async function verifyEmailAction(payload: { email: string; otp: string })
       body: formData.toString(),
     });
 
-    const data = await res.json();
+    const text = await res.text();
+    const data = text && text.trim() ? JSON.parse(text) : {};
 
     if (!res.ok) {
       return {
         success: false,
-        message: data.message || "Email verification failed",
+        message: data?.message || "Email verification failed",
       };
     }
 
@@ -65,12 +66,13 @@ export async function resendOtpAction(email: string) {
       body: formData.toString(),
     });
 
-    const data = await res.json();
+    const text = await res.text();
+    const data = text && text.trim() ? JSON.parse(text) : {};
 
     if (!res.ok) {
       return {
         success: false,
-        message: data.message || "Failed to resend OTP",
+        message: data?.message || "Failed to resend OTP",
       };
     }
 

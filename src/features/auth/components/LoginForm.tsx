@@ -22,7 +22,7 @@ import AppSubmitButton from "@/components/shared/form/AppSubmitButton";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/features/user/hooks/useUser";
 import { toast } from "sonner";
-import SocialLogin from "@/components/shared/socialLogin/SocialLogin";
+import SocialLogin from "@/components/shared/socialLogin/socialLogin";
 import { UserRole } from "@/lib/auth/authUtils";
 
 interface LoginFormProps {

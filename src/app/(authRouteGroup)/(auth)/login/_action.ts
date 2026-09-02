@@ -34,25 +34,38 @@ export const loginAction = async (
   }
 
   try {
-    const response = await httpClient.post<ILoginResponse>(
+    const response = await httpClient.post<any>(
       "/auth/login",
       parsedPayload.data
     );
 
-    const { accessToken, refreshToken, token, user } = response.data;
+    const loginData = response?.data || response;
+    const accessToken = loginData?.accessToken;
+    const refreshToken = loginData?.refreshToken;
+    const token = loginData?.token;
+    const user = loginData?.user;
+
+    if (!user || !accessToken) {
+      return {
+        success: false,
+        message: loginData?.message || "Login failed - invalid credentials",
+      };
+    }
 
     const { role, needPasswordChange, email } = user;
 
     // ✅ set cookies - 3 days auto logout
     const threeDays = 3 * 24 * 60 * 60;
-    await setTokenInCookies("accessToken", accessToken, 24 * 60 * 60, threeDays);
-    await setTokenInCookies("refreshToken", refreshToken, 24 * 60 * 60, threeDays);
-    await setTokenInCookies(
-      "better-auth.session_token",
-      token,
-      24 * 60 * 60,
-      threeDays
-    );
+    if (accessToken) await setTokenInCookies("accessToken", accessToken, 24 * 60 * 60, threeDays);
+    if (refreshToken) await setTokenInCookies("refreshToken", refreshToken, 24 * 60 * 60, threeDays);
+    if (token) {
+      await setTokenInCookies(
+        "better-auth.session_token",
+        token,
+        24 * 60 * 60,
+        threeDays
+      );
+    }
 
     // ✅ password change flow
     if (needPasswordChange) {
