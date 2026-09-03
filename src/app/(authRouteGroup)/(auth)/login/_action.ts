@@ -54,16 +54,17 @@ export const loginAction = async (
 
     const { role, needPasswordChange, email } = user;
 
-    // ✅ set cookies - 3 days auto logout
-    const threeDays = 3 * 24 * 60 * 60;
-    if (accessToken) await setTokenInCookies("accessToken", accessToken, 24 * 60 * 60, threeDays);
-    if (refreshToken) await setTokenInCookies("refreshToken", refreshToken, 24 * 60 * 60, threeDays);
+    // ✅ set cookies - 7 days auto logout / continuous session
+    const sevenDays = 7 * 24 * 60 * 60;
+    const oneDay = 24 * 60 * 60;
+    if (accessToken) await setTokenInCookies("accessToken", accessToken, oneDay, oneDay);
+    if (refreshToken) await setTokenInCookies("refreshToken", refreshToken, sevenDays, sevenDays);
     if (token) {
       await setTokenInCookies(
         "better-auth.session_token",
         token,
-        24 * 60 * 60,
-        threeDays
+        sevenDays,
+        sevenDays
       );
     }
 

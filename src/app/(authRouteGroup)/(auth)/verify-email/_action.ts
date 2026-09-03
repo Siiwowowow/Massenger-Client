@@ -3,6 +3,7 @@
 "use server";
 
 import { verifyEmailZodSchema } from "@/features/auth/schemas/auth.schema";
+import { safeJsonParseText } from "@/lib/utils";
 
 const BASE_API_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -30,7 +31,7 @@ export async function verifyEmailAction(payload: { email: string; otp: string })
     });
 
     const text = await res.text();
-    const data = text && text.trim() ? JSON.parse(text) : {};
+    const data = safeJsonParseText(text, {});
 
     if (!res.ok) {
       return {
@@ -67,7 +68,7 @@ export async function resendOtpAction(email: string) {
     });
 
     const text = await res.text();
-    const data = text && text.trim() ? JSON.parse(text) : {};
+    const data = safeJsonParseText(text, {});
 
     if (!res.ok) {
       return {

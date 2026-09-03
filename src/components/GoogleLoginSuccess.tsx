@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 //src/components/GoogleLoginSuccess.tsx
 "use client";
 
@@ -30,7 +31,12 @@ export function GoogleLoginSuccess() {
         if (!res.ok) return;
         const text = await res.text();
         if (!text || !text.trim()) return;
-        const data = JSON.parse(text);
+        let data: any = null;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          return;
+        }
         if (data?.data) {
           setUser(data.data);
         }
@@ -61,4 +67,4 @@ export function GoogleLoginSuccess() {
   }, [searchParams, router, setUser]);
 
   return null;
-}
+}

@@ -2,6 +2,7 @@
 "use server";
 
 import { setTokenInCookies } from "@/lib/auth/tokenUtils";
+import { jwtUtils } from "@/lib/auth/jwtUtils";
 import { cookies } from "next/headers";
 import { cache } from "react";
 
@@ -31,7 +32,8 @@ export async function getNewTokensWithRefreshToken(refreshToken: string): Promis
             headers: {
                 "Content-Type": "application/json",
                 Cookie: `refreshToken=${refreshToken}`
-            }
+            },
+            body: JSON.stringify({ refreshToken })
         });
 
         if (!res.ok) {
@@ -44,9 +46,13 @@ export async function getNewTokensWithRefreshToken(refreshToken: string): Promis
         const { accessToken, refreshToken: newRefreshToken, token } = body.data;
 
         // Still persist to cookies for the next server-side request (non-middleware)
-        if (accessToken) await setTokenInCookies("accessToken", accessToken);
-        if (newRefreshToken) await setTokenInCookies("refreshToken", newRefreshToken);
-        if (token) await setTokenInCookies("better-auth.session_token", token, 24 * 60 * 60);
+        try {
+            if (accessToken) await setTokenInCookies("accessToken", accessToken, 24 * 60 * 60, 24 * 60 * 60);
+            if (newRefreshToken) await setTokenInCookies("refreshToken", newRefreshToken, 7 * 24 * 60 * 60, 7 * 24 * 60 * 60);
+            if (token) await setTokenInCookies("better-auth.session_token", token, 7 * 24 * 60 * 60, 7 * 24 * 60 * 60);
+        } catch {
+            // Ignored if called during RSC rendering
+        }
 
         return { accessToken, refreshToken: newRefreshToken, token };
     } catch (error) {
@@ -77,7 +83,8 @@ async function refreshAndGetTokens(
             headers: {
                 "Content-Type": "application/json",
                 Cookie: `refreshToken=${refreshToken}`
-            }
+            },
+            body: JSON.stringify({ refreshToken })
         });
 
         if (!res.ok) return null;
@@ -89,10 +96,14 @@ async function refreshAndGetTokens(
 
         if (!accessToken) return null;
 
-        // Persist to cookies so the NEXT request will have them
-        await setTokenInCookies("accessToken", accessToken);
-        if (newRefreshToken) await setTokenInCookies("refreshToken", newRefreshToken);
-        if (token) await setTokenInCookies("better-auth.session_token", token, 24 * 60 * 60);
+        // Persist to cookies if allowed in current context
+        try {
+            await setTokenInCookies("accessToken", accessToken, 24 * 60 * 60, 24 * 60 * 60);
+            if (newRefreshToken) await setTokenInCookies("refreshToken", newRefreshToken, 7 * 24 * 60 * 60, 7 * 24 * 60 * 60);
+            if (token) await setTokenInCookies("better-auth.session_token", token, 7 * 24 * 60 * 60, 7 * 24 * 60 * 60);
+        } catch {
+            // Ignored in RSC render
+        }
 
         return { accessToken, sessionToken: token ?? "" };
     } catch (error) {
@@ -113,13 +124,17 @@ export const getUserInfo = cache(async () => {
         let accessToken = cookieStore.get("accessToken")?.value;
         const refreshToken = cookieStore.get("refreshToken")?.value;
 
-        // If no accessToken but we have a refreshToken, get new tokens.
-        // Use the RETURNED values directly — do NOT re-read cookieStore,
-        // because cookieStore.get() still returns the old request cookies
-        // after a set() call within the same request.
-        if (!accessToken && refreshToken) {
+        // Check if accessToken is missing or expired
+        let isTokenValid = false;
+        if (accessToken) {
+            const verification = jwtUtils.verifyToken(accessToken, process.env.JWT_ACCESS_SECRET || "accesssecret");
+            isTokenValid = !!verification?.success;
+        }
+
+        // If no valid accessToken but we have a refreshToken, get new tokens
+        if (!isTokenValid && refreshToken) {
             const newTokens = await refreshAndGetTokens(refreshToken);
-            if (newTokens) {
+            if (newTokens?.accessToken) {
                 accessToken = newTokens.accessToken;
             }
         }

@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use server";
 
+import { safeJsonParseText } from "@/lib/utils";
+
 const BASE_API_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 // ✅ IRegisterPayload বাদ — এখন সরাসরি FormData নেবে
@@ -14,7 +16,7 @@ export async function registerAction(formData: FormData) {
     });
 
     const text = await res.text();
-    const data = text && text.trim() ? JSON.parse(text) : {};
+    const data = safeJsonParseText(text, {});
 
     if (!res.ok) {
       return {

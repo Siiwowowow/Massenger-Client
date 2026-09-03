@@ -9,23 +9,35 @@ export const setCookie = async (
     value : string,
     maxAgeInSeconds : number,
 ) => {
-    const cookieStore = await cookies();
+    try {
+        const cookieStore = await cookies();
 
-    cookieStore.set(name, value, {
-        httpOnly : true,
-        secure : isProduction,
-        sameSite : "lax",
-        path : "/",
-        maxAge : maxAgeInSeconds,
-    })
+        cookieStore.set(name, value, {
+            httpOnly : true,
+            secure : isProduction,
+            sameSite : "lax",
+            path : "/",
+            maxAge : maxAgeInSeconds,
+        });
+    } catch {
+        // Next.js throws if cookies().set is called in Server Component render context
+    }
 }
 
 export const getCookie = async (name : string) => {
-    const cookieStore = await cookies();
-    return cookieStore.get(name)?.value;
+    try {
+        const cookieStore = await cookies();
+        return cookieStore.get(name)?.value;
+    } catch {
+        return undefined;
+    }
 }
 
 export const deleteCookie = async (name : string) => {
-    const cookieStore = await cookies();
-    cookieStore.delete(name);
+    try {
+        const cookieStore = await cookies();
+        cookieStore.delete(name);
+    } catch {
+        // Ignore if unable to delete in current context
+    }
 }
