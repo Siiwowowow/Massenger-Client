@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Menu, X, LayoutDashboard } from "lucide-react";
+import { Menu, X, LayoutDashboard, MessageSquare } from "lucide-react";
 import { useUser } from "@/features/user/hooks/useUser";
 import Logo from "./Logo";
 import AuthButtons from "./AuthButtons";
@@ -24,7 +24,10 @@ export default function MobileNav({
   const allLinks: NavLink[] = useMemo(() => [
     ...publicLinks,
     ...(user
-      ? [{ label: "Dashboard", href: dashboardRoute, icon: LayoutDashboard }]
+      ? [
+          { label: "Dashboard", href: dashboardRoute, icon: LayoutDashboard },
+          { label: "Messages", href: "/messages", icon: MessageSquare },
+        ]
       : []),
   ], [publicLinks, user, dashboardRoute]);
 

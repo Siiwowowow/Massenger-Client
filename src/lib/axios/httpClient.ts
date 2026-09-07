@@ -13,6 +13,14 @@ const instance = axios.create({
   },
 });
 
+// Request interceptor to attach project context for communication APIs
+instance.interceptors.request.use((config) => {
+  if (env.client.NEXT_PUBLIC_PROJECT_ID && !config.headers["x-project-id"]) {
+    config.headers["x-project-id"] = env.client.NEXT_PUBLIC_PROJECT_ID;
+  }
+  return config;
+});
+
 // Response interceptor to handle session expiry (401)
 instance.interceptors.response.use(
   (response) => response,

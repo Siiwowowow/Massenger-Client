@@ -1,0 +1,50 @@
+# src/lib/graphql/operations/project.graphql
+
+query GetProjectById($id: ID!) {
+  project(id: $id) {
+    id
+    name
+    slug
+    status
+    totalConversations
+    totalUsers
+    createdAt
+    updatedAt
+  }
+}
+
+query GetProjectBySlug($slug: String!) {
+  projectBySlug(slug: $slug) {
+    id
+    name
+    slug
+    status
+    totalConversations
+    totalUsers
+    createdAt
+    updatedAt
+  }
+}
+
+query GetProjects($input: ProjectPaginationInput) {
+  projects(input: $input) {
+    data {
+      id
+      name
+      slug
+      status
+      totalConversations
+      totalUsers
+      createdAt
+      updatedAt
+    }
+    meta {
+      page
+      limit
+      totalItems
+      totalPages
+      hasNextPage
+      hasPreviousPage
+    }
+  }
+}

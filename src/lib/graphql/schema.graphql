@@ -1,0 +1,230 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type AuthPayload {
+  session: Session
+  token: String
+  user: User!
+}
+
+"""Input for creating a new project"""
+input CreateProjectInput {
+  """Name of the project"""
+  name: String!
+
+  """Unique slug identifier for the project"""
+  slug: String!
+
+  """Initial status of the project"""
+  status: ProjectStatus
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+input ForgotPasswordInput {
+  email: String!
+}
+
+input LoginInput {
+  email: String!
+  password: String!
+}
+
+type Mutation {
+  """Create a new project tenant (Admin only)"""
+  createProject(input: CreateProjectInput!): Project!
+
+  """Request password reset email"""
+  forgotPassword(input: ForgotPasswordInput!): Boolean!
+
+  """Authenticate user with email and password"""
+  login(input: LoginInput!): AuthPayload!
+
+  """Sign out and invalidate session"""
+  logout: Boolean!
+
+  """Regenerate API Key and Secret for a project (Admin only)"""
+  regenerateProjectKeys(id: ID!): Project!
+
+  """Register a new user account"""
+  register(input: RegisterInput!): AuthPayload!
+
+  """Reset password with token"""
+  resetPassword(input: ResetPasswordInput!): Boolean!
+
+  """Update current user profile"""
+  updateProfile(input: UpdateUserInput!): User!
+
+  """Update project details or operational status (Admin only)"""
+  updateProject(id: ID!, input: UpdateProjectInput!): Project!
+
+  """Admin mutation to update user role"""
+  updateUserRole(input: UpdateUserRoleInput!): User!
+
+  """Admin mutation to update user status"""
+  updateUserStatus(input: UpdateUserStatusInput!): User!
+
+  """Verify email address"""
+  verifyEmail(input: VerifyEmailInput!): Boolean!
+}
+
+"""Pagination metadata"""
+type PaginationMeta {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  limit: Int!
+  page: Int!
+  totalItems: Int!
+  totalPages: Int!
+}
+
+"""Project tenant entity for communication isolation"""
+type Project {
+  apiKey: String!
+  apiSecret: String!
+  createdAt: DateTime!
+  id: ID!
+  name: String!
+  slug: String!
+  status: ProjectStatus!
+
+  """Total conversations in project"""
+  totalConversations: Int
+
+  """Total communication users in project"""
+  totalUsers: Int
+  updatedAt: DateTime!
+}
+
+"""Paginated project response"""
+type ProjectPagination {
+  data: [Project!]!
+  meta: PaginationMeta!
+}
+
+"""Query parameters for project pagination and filtering"""
+input ProjectPaginationInput {
+  """Items per page (default: 10)"""
+  limit: Int = 10
+
+  """Page number (default: 1)"""
+  page: Int = 1
+
+  """Optional search term to filter by name or slug"""
+  search: String
+}
+
+"""Project operational status"""
+enum ProjectStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+type Query {
+  """Get current authenticated user profile"""
+  me: User!
+
+  """Get a single project by ID (Admin only)"""
+  project(id: ID!): Project!
+
+  """Get a single project by its unique slug (Admin only)"""
+  projectBySlug(slug: String!): Project!
+
+  """Get paginated list of projects with search support (Admin only)"""
+  projects(input: ProjectPaginationInput): ProjectPagination!
+
+  """Admin query for system overview statistics"""
+  systemStats: SystemStats!
+
+  """Get user by ID with DataLoader optimization"""
+  user(id: ID!): User!
+}
+
+input RegisterInput {
+  email: String!
+  name: String!
+  password: String!
+  phoneNumber: String
+}
+
+input ResetPasswordInput {
+  newPassword: String!
+  token: String!
+}
+
+"""User access role"""
+enum Role {
+  ADMIN
+  SUPER_ADMIN
+  USER
+}
+
+type Session {
+  expiresAt: DateTime!
+  id: ID!
+  ipAddress: String
+  token: String!
+  userAgent: String
+}
+
+type SystemStats {
+  activeSessions: Int!
+  activeUsers: Int!
+  suspendedUsers: Int!
+  totalUsers: Int!
+}
+
+"""Input for updating an existing project"""
+input UpdateProjectInput {
+  """Updated name of the project"""
+  name: String
+
+  """Updated operational status"""
+  status: ProjectStatus
+}
+
+input UpdateUserInput {
+  image: String
+  name: String
+  phoneNumber: String
+}
+
+input UpdateUserRoleInput {
+  role: Role!
+  userId: ID!
+}
+
+input UpdateUserStatusInput {
+  status: UserStatus!
+  userId: ID!
+}
+
+type User {
+  createdAt: DateTime!
+  email: String!
+  emailVerified: Boolean!
+  id: ID!
+  image: String
+  name: String!
+  phoneNumber: String
+  role: Role!
+  status: UserStatus!
+  updatedAt: DateTime!
+}
+
+"""User account status"""
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  PENDING_VERIFICATION
+  SUSPENDED
+}
+
+input VerifyEmailInput {
+  token: String!
+}

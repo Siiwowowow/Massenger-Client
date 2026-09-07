@@ -2,95 +2,68 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import AppSubmitButton from "@/components/shared/form/AppSubmitButton";
-import AppField from "@/components/shared/form/AppField";
-import { useForm } from "@tanstack/react-form";
-import { useState, useRef } from "react";
+import React, { useState, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
 import { registerAction } from "@/app/(authRouteGroup)/(auth)/register/_action";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Camera, X, Eye, EyeOff, User, Mail, Lock, Phone } from "lucide-react";
+import {
+  User,
+  Mail,
+  Lock,
+  Camera,
+  X,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  Loader2,
+  MessageSquare,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import SocialLogin from "@/components/shared/socialLogin/socialLogin";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
-const RegisterForm = () => {
+export default function RegisterForm() {
   const router = useRouter();
+
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(true);
 
   const [serverError, setServerError] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const form = useForm({
-    defaultValues: {
-      name: "",
-      email: "",
-      password: "",
-      phoneNumber: "",
-    },
+  // Dynamic Password Strength Calculator (red -> yellow -> #9ef01a green)
+  const passwordStrength = useMemo(() => {
+    if (!password) return { level: 0, label: "", color: "bg-slate-200", width: "0%" };
+    if (password.length < 6) {
+      return { level: 1, label: "Weak", color: "bg-rose-500", width: "33%" };
+    }
+    const hasNumber = /\d/.test(password);
+    const hasSpecialOrUpper = /[!@#$%^&*(),.?":{}|<>A-Z]/.test(password);
 
-    onSubmit: async ({ value }) => {
-      setServerError(null);
-      setIsLoading(true);
-
-      if (!value.name || !value.email || !value.password) {
-        setServerError("Name, email and password are required");
-        setIsLoading(false);
-        return;
-      }
-
-      if (value.password.length < 6) {
-        setServerError("Password must be at least 6 characters");
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        const formData = new FormData();
-        formData.append("name", value.name);
-        formData.append("email", value.email);
-        formData.append("password", value.password);
-        formData.append("role", "USER");
-
-        if (imageFile) {
-          formData.append("profilePhoto", imageFile);
-        }
-
-        if (value.phoneNumber) {
-          formData.append("phoneNumber", value.phoneNumber);
-        }
-
-        const result = await registerAction(formData) as any;
-
-        if (!result.success) {
-          setServerError(result.message);
-          toast.error(result.message);
-          setIsLoading(false);
-          return;
-        }
-
-        toast.success("Registration successful! Please check your email.");
-        router.push(`/verify-email?email=${encodeURIComponent(value.email)}`);
-      } catch (err: any) {
-        setServerError(err.message);
-        toast.error(err.message);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-  });
+    if (password.length >= 8 && hasNumber && hasSpecialOrUpper) {
+      return { level: 3, label: "Strong", color: "bg-[#9ef01a]", width: "100%" };
+    }
+    if (password.length >= 6 && (hasNumber || hasSpecialOrUpper)) {
+      return { level: 2, label: "Medium", color: "bg-amber-400", width: "66%" };
+    }
+    return { level: 1, label: "Weak", color: "bg-rose-500", width: "33%" };
+  }, [password]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image must be less than 5MB");
+      toast.error("Image size must be less than 5MB");
       return;
     }
 
@@ -106,182 +79,327 @@ const RegisterForm = () => {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setServerError(null);
+
+    if (!name.trim()) {
+      setServerError("Please enter your full name");
+      return;
+    }
+    if (!email.trim()) {
+      setServerError("Please enter a valid email address");
+      return;
+    }
+    if (!password) {
+      setServerError("Please create a password");
+      return;
+    }
+    if (password.length < 6) {
+      setServerError("Password must be at least 6 characters");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setServerError("Passwords do not match");
+      return;
+    }
+    if (!termsAccepted) {
+      setServerError("Please accept the Terms of Service to continue");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const formData = new FormData();
+      formData.append("name", name.trim());
+      formData.append("email", email.trim());
+      formData.append("password", password);
+      formData.append("role", "USER");
+
+      if (imageFile) {
+        formData.append("profilePhoto", imageFile);
+      }
+
+      const result = (await registerAction(formData)) as any;
+
+      if (!result.success) {
+        setServerError(result.message || "Registration failed");
+        toast.error(result.message || "Registration failed");
+        return;
+      }
+
+      toast.success("Account created successfully!");
+      router.push(`/verify-email?email=${encodeURIComponent(email.trim())}`);
+    } catch (err: any) {
+      setServerError(err.message || "An unexpected error occurred");
+      toast.error(err.message || "Registration failed");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen w-full flex items-center justify-center py-8 sm:py-12 px-4 sm:px-6 bg-gradient-to-br from-blue-50/30 via-white to-blue-50/20">
-      <Card className="w-full max-w-lg mx-auto shadow-2xl border-0 rounded-2xl overflow-hidden relative">
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600" />
-        
-        <CardHeader className="text-center pt-8 pb-4">
-          <div className="mx-auto w-14 h-14 bg-gradient-to-br from-blue-600 to-blue-500 rounded-2xl flex items-center justify-center shadow-lg mb-4">
-            <User className="w-7 h-7 text-white" />
+    <div
+      className="w-full max-w-[420px] mx-auto rounded-[22px] bg-white/95 backdrop-blur-md border border-[#e2e8f0] shadow-[0_8px_30px_rgba(0,0,0,0.06)] p-4 sm:p-5 animate-fade-slide-in"
+      style={{ colorScheme: "light" }}
+    >
+      {/* Top Brand Header */}
+      <div className="flex items-center justify-between mb-2.5">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-xl bg-[#9ef01a] text-[#1a1a1a] flex items-center justify-center shadow-xs">
+            <MessageSquare className="w-4 h-4 stroke-[2.4]" />
           </div>
-          <CardTitle className="text-2xl font-bold">
-            Create Account
-          </CardTitle>
-          <CardDescription className="text-gray-500">
-            Join BetterAuth and manage your secure account
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent className="space-y-6 px-6 pb-8">
-          {/* Avatar Upload Section */}
-          <div className="flex justify-center">
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="relative w-24 h-24 rounded-full border-2 border-dashed border-blue-600/40 hover:border-blue-600 transition-all duration-200 flex items-center justify-center overflow-hidden bg-blue-50/30 hover:bg-blue-50/50"
-              >
-                {imagePreview ? (
-                  <img
-                    src={imagePreview}
-                    alt="Profile preview"
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <div className="flex flex-col items-center gap-1 text-blue-600">
-                    <Camera className="w-6 h-6" />
-                    <span className="text-[10px] font-medium">Upload photo</span>
-                  </div>
-                )}
-              </button>
-              {imagePreview && (
-                <button
-                  onClick={removeImage}
-                  className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-all shadow-md z-10"
-                >
-                  <X size={12} />
-                </button>
-              )}
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/jpg,image/png,image/webp"
-              className="hidden"
-              onChange={handleImageChange}
-            />
+          <div>
+            <h1 className="font-bold text-sm text-slate-900 tracking-tight leading-tight">
+              Pulse Messenger
+            </h1>
+            <p className="text-[10px] font-medium text-slate-500 leading-tight">Real-Time Workspace</p>
           </div>
+        </div>
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-700 border border-[#e2e8f0]">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#9ef01a]" />
+          Register
+        </span>
+      </div>
 
-          {/* Form */}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              form.handleSubmit();
-            }}
-            className="space-y-4"
-          >
-            <form.Field name="name">
-              {(field) => (
-                <AppField
-                  field={field}
-                  label="Full Name"
-                  placeholder="Enter your full name"
-                  prepend={<User className="w-4 h-4 text-gray-400" />}
-                  required
+      {/* Title & Description */}
+      <div className="mb-2.5">
+        <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-tight">
+          Create your account
+        </h2>
+        <p className="text-xs text-slate-500 mt-0.5">
+          Fill in your profile details to join your workspace.
+        </p>
+      </div>
+
+      {/* Server Error Alert */}
+      {serverError && (
+        <Alert variant="destructive" className="mb-2.5 py-1.5 px-3 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <AlertDescription>{serverError}</AlertDescription>
+        </Alert>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-2.5">
+        {/* Profile Photo Upload */}
+        <div className="flex items-center gap-3 p-2 rounded-xl bg-slate-50/80 border border-[#eef1f5]">
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="relative w-11 h-11 rounded-full border-2 border-dashed border-[#d7dbe3] hover:border-slate-700 transition-all duration-150 flex items-center justify-center overflow-hidden bg-white hover:bg-slate-50 group cursor-pointer"
+              aria-label="Upload profile photo"
+            >
+              {imagePreview ? (
+                <img
+                  src={imagePreview}
+                  alt="Profile preview"
+                  className="w-full h-full object-cover"
                 />
-              )}
-            </form.Field>
-
-            <form.Field name="email">
-              {(field) => (
-                <AppField
-                  field={field}
-                  label="Email Address"
-                  type="email"
-                  placeholder="you@example.com"
-                  prepend={<Mail className="w-4 h-4 text-gray-400" />}
-                  required
-                />
-              )}
-            </form.Field>
-
-            {/* Password Field */}
-            <form.Field name="password">
-              {(field) => (
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium text-gray-700">
-                    Password <span className="text-red-500 ml-1">*</span>
-                  </Label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 z-10">
-                      <Lock className="w-4 h-4 text-gray-400" />
-                    </div>
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      value={field.state.value}
-                      placeholder="Create a password"
-                      onBlur={field.handleBlur}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-gray-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 transition-all outline-none"
-                    />
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-2 z-10">
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? (
-                          <EyeOff className="w-4 h-4 text-gray-400" />
-                        ) : (
-                          <Eye className="w-4 h-4 text-gray-400" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                  {field.state.meta.isTouched && field.state.meta.errors.length > 0 && (
-                    <p className="text-sm text-red-500">{field.state.meta.errors[0]}</p>
-                  )}
+              ) : (
+                <div className="flex flex-col items-center text-slate-400 group-hover:text-slate-700 transition-colors">
+                  <Camera className="w-3.5 h-3.5" />
                 </div>
               )}
-            </form.Field>
-            <p className="text-xs text-gray-400 -mt-2">Minimum 6 characters</p>
+            </button>
 
-            <form.Field name="phoneNumber">
-              {(field) => (
-                <AppField
-                  field={field}
-                  label="Phone Number"
-                  placeholder="+880 1XXX XXXXXX"
-                  prepend={<Phone className="w-4 h-4 text-gray-400" />}
-                />
-              )}
-            </form.Field>
-
-            {serverError && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3">
-                <p className="text-red-600 text-sm text-center">{serverError}</p>
-              </div>
-            )}
-
-            <AppSubmitButton
-              isPending={isLoading}
-              pendingLabel="Creating account..."
-              className="w-full"
-            >
-              Create Account
-            </AppSubmitButton>
-            <SocialLogin/>
-          </form>
-
-          <div className="text-center pt-2">
-            <p className="text-sm text-gray-500">
-              Already have an account?{" "}
+            {imagePreview && (
               <button
-                onClick={() => router.push("/login")}
-                className="text-blue-600 font-semibold hover:text-blue-700 hover:underline transition-colors"
+                type="button"
+                onClick={removeImage}
+                className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full flex items-center justify-center hover:bg-rose-600 shadow-xs cursor-pointer"
+                aria-label="Remove photo"
               >
-                Sign in
+                <X size={9} />
               </button>
-            </p>
+            )}
           </div>
-        </CardContent>
-      </Card>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/jpg,image/png,image/webp"
+            className="hidden"
+            onChange={handleImageChange}
+          />
+
+          <div className="text-xs text-slate-600 min-w-0 flex-1">
+            <p className="font-semibold text-slate-800 text-xs leading-tight">
+              Profile photo <span className="text-slate-400 font-normal">(optional)</span>
+            </p>
+            <p className="text-[10px] text-slate-500 leading-tight mt-0.5">PNG, JPG or WEBP up to 5MB</p>
+          </div>
+        </div>
+
+        {/* Full Name */}
+        <div className="space-y-1">
+          <label className="block text-xs font-semibold text-slate-700">
+            Full Name <span className="text-rose-500">*</span>
+          </label>
+          <div className="relative input-human-focus rounded-xl border border-[#d7dbe3] bg-white flex items-center overflow-hidden">
+            <div className="pl-3.5 text-slate-400 pointer-events-none">
+              <User className="w-4 h-4" />
+            </div>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Alex Morgan"
+              required
+              className="w-full bg-transparent px-3 py-2 text-sm text-black placeholder:text-slate-400 outline-none font-sans auth-input"
+              style={{ colorScheme: "light" }}
+            />
+          </div>
+        </div>
+
+        {/* Email Address */}
+        <div className="space-y-1">
+          <label className="block text-xs font-semibold text-slate-700">
+            Email Address <span className="text-rose-500">*</span>
+          </label>
+          <div className="relative input-human-focus rounded-xl border border-[#d7dbe3] bg-white flex items-center overflow-hidden">
+            <div className="pl-3.5 text-slate-400 pointer-events-none">
+              <Mail className="w-4 h-4" />
+            </div>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="alex@example.com"
+              required
+              className="w-full bg-transparent px-3 py-2 text-sm text-black placeholder:text-slate-400 outline-none font-sans auth-input"
+              style={{ colorScheme: "light" }}
+            />
+          </div>
+        </div>
+
+        {/* Password */}
+        <div className="space-y-1">
+          <label className="block text-xs font-semibold text-slate-700">
+            Password <span className="text-rose-500">*</span>
+          </label>
+          <div className="relative input-human-focus rounded-xl border border-[#d7dbe3] bg-white flex items-center overflow-hidden">
+            <div className="pl-3.5 text-slate-400 pointer-events-none">
+              <Lock className="w-4 h-4" />
+            </div>
+            <input
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Minimum 6 characters"
+              required
+              className="w-full bg-transparent px-3 py-2 text-sm text-black placeholder:text-slate-400 outline-none font-sans auth-input"
+              style={{ colorScheme: "light" }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="pr-3 text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+
+          {/* Dynamic Password Strength Meter */}
+          {password.length > 0 && (
+            <div className="pt-1">
+              <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-300 ${passwordStrength.color}`}
+                  style={{ width: passwordStrength.width }}
+                />
+              </div>
+              <div className="flex justify-between items-center text-[10px] text-slate-500 mt-1">
+                <span>
+                  Strength: <strong className="text-slate-800 font-semibold">{passwordStrength.label}</strong>
+                </span>
+                <span>Min. 6 chars</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Confirm Password */}
+        <div className="space-y-1">
+          <label className="block text-xs font-semibold text-slate-700">
+            Confirm Password <span className="text-rose-500">*</span>
+          </label>
+          <div className="relative input-human-focus rounded-xl border border-[#d7dbe3] bg-white flex items-center overflow-hidden">
+            <div className="pl-3.5 text-slate-400 pointer-events-none">
+              <Lock className="w-4 h-4" />
+            </div>
+            <input
+              type={showConfirmPassword ? "text" : "password"}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Re-enter your password"
+              required
+              className="w-full bg-transparent px-3 py-2 text-sm text-black placeholder:text-slate-400 outline-none font-sans auth-input"
+              style={{ colorScheme: "light" }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              className="pr-3 text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
+              aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+            >
+              {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+          {confirmPassword && password !== confirmPassword && (
+            <p className="text-[11px] text-rose-500 flex items-center gap-1">
+              <AlertCircle className="w-3 h-3" />
+              Passwords do not match
+            </p>
+          )}
+        </div>
+
+        {/* Terms Checkbox */}
+        <div className="pt-0.5">
+          <label className="flex items-start gap-2.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={termsAccepted}
+              onChange={(e) => setTermsAccepted(e.target.checked)}
+              className="mt-0.5 w-4 h-4 rounded border-[#d7dbe3] accent-[#9ef01a] cursor-pointer"
+            />
+            <span className="text-xs text-slate-500 leading-snug">
+              I agree to the <span className="text-slate-800 underline">Terms of Service</span> and{" "}
+              <span className="text-slate-800 underline">Privacy Policy</span>.
+            </span>
+          </label>
+        </div>
+
+        {/* Primary Create Account Button: #9ef01a */}
+        <Button
+          type="submit"
+          disabled={isLoading}
+          className="w-full h-9.5 mt-1 rounded-xl bg-[#9ef01a] hover:bg-[#8ee015] active:scale-[0.99] text-[#1a1a1a] font-semibold text-sm transition-all shadow-xs border-0 cursor-pointer disabled:opacity-60"
+        >
+          {isLoading ? (
+            <span className="flex items-center justify-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin text-[#1a1a1a]" />
+              <span>Creating Account...</span>
+            </span>
+          ) : (
+            <span>Create Account</span>
+          )}
+        </Button>
+      </form>
+
+      {/* Bottom Login Link */}
+      <div className="mt-3.5 pt-2.5 border-t border-[#e2e8f0] text-center">
+        <p className="text-xs text-slate-500">
+          Already have an account?{" "}
+          <Link
+            href="/login"
+            className="text-slate-950 font-semibold hover:underline underline-offset-4 transition-colors"
+          >
+            Log in
+          </Link>
+        </p>
+      </div>
     </div>
   );
-};
-
-export default RegisterForm;
+}

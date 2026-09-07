@@ -9,6 +9,12 @@ const clientEnvSchema = z.object({
     .string()
     .min(1, "NEXT_PUBLIC_GRAPHQL_URL is required")
     .default("http://localhost:5000/graphql"),
+  NEXT_PUBLIC_PROJECT_ID: z
+    .string()
+    .default("6a9a46e2c13d4f5a5538dcd5"),
+  NEXT_PUBLIC_SOCKET_URL: z
+    .string()
+    .default("http://localhost:5000"),
 });
 
 const serverEnvSchema = z.object({
@@ -19,6 +25,8 @@ const serverEnvSchema = z.object({
 const parsedClient = clientEnvSchema.safeParse({
   NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
   NEXT_PUBLIC_GRAPHQL_URL: process.env.NEXT_PUBLIC_GRAPHQL_URL,
+  NEXT_PUBLIC_PROJECT_ID: process.env.NEXT_PUBLIC_PROJECT_ID,
+  NEXT_PUBLIC_SOCKET_URL: process.env.NEXT_PUBLIC_SOCKET_URL,
 });
 
 if (!parsedClient.success) {

@@ -4,7 +4,7 @@
 
 import { useMemo } from "react";
 import { useUser } from "@/features/user/hooks/useUser";
-import { LayoutDashboard } from "lucide-react";
+import { LayoutDashboard, MessageSquare } from "lucide-react";
 import Logo from "./Logo";
 import AuthButtons from "./AuthButtons";
 import UserAvatar from "./UserAvatar";
@@ -25,7 +25,10 @@ export default function DesktopNav({
   const navLinks: NavLink[] = useMemo(() => [
     ...publicLinks,
     ...(user
-      ? [{ label: "Dashboard", href: dashboardRoute, icon: LayoutDashboard }]
+      ? [
+          { label: "Dashboard", href: dashboardRoute, icon: LayoutDashboard },
+          { label: "Messages", href: "/messages", icon: MessageSquare },
+        ]
       : []),
   ], [publicLinks, user, dashboardRoute]);
 

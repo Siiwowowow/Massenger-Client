@@ -56,9 +56,9 @@ export const getDefaultDashboardRoute = (role: UserRole): string => {
   switch (role) {
     case "SUPER_ADMIN":
     case "ADMIN":
-      return "/admin/dashboard";
+      return "/";
     case "USER":
-      return "/user/dashboard";
+      return "/";
     default:
       return "/";
   }
