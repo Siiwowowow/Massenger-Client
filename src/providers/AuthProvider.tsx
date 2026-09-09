@@ -24,9 +24,24 @@ export function AuthProvider({
 
     useEffect(() => {
         setUser(initialUser);
+        if (typeof window !== "undefined") {
+            if (initialUser?.id) {
+                localStorage.setItem("pulse_user_id", initialUser.id);
+                localStorage.setItem("pulse_external_id", initialUser.id);
+                if (initialUser.accessToken) {
+                    localStorage.setItem("pulse_access_token", initialUser.accessToken);
+                }
+            }
+        }
     }, [initialUser]);
 
     const logout = useCallback(async () => {
+        if (typeof window !== "undefined") {
+            localStorage.removeItem("pulse_user_id");
+            localStorage.removeItem("pulse_external_id");
+            localStorage.removeItem("pulse_access_token");
+            localStorage.removeItem("pulse_comm_user_id");
+        }
         setUser(null);
         await logoutUser();
         window.location.href = "/login";

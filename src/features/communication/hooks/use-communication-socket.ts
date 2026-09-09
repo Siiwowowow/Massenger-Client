@@ -45,6 +45,9 @@ export function useCommunicationSocket() {
         });
 
         if (isMounted) {
+          if (synced?.id && typeof window !== "undefined") {
+            localStorage.setItem("pulse_comm_user_id", synced.id);
+          }
           setCommUser(synced);
         }
       } catch (err) {

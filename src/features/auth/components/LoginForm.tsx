@@ -54,7 +54,14 @@ export default function LoginForm({ redirectPath, defaultEmail = "" }: LoginForm
         }
 
         toast.success("Welcome back!");
-        setUser(result.user);
+        if (result.accessToken && typeof window !== "undefined") {
+          localStorage.setItem("pulse_access_token", result.accessToken);
+        }
+        if (result.user?.id && typeof window !== "undefined") {
+          localStorage.setItem("pulse_user_id", result.user.id);
+          localStorage.setItem("pulse_external_id", result.user.id);
+        }
+        setUser({ ...result.user, accessToken: result.accessToken });
 
         router.refresh();
 

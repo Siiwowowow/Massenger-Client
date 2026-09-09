@@ -175,7 +175,11 @@ export const getUserInfo = cache(async () => {
         }
 
         const body = await safeJsonParse(res);
-        return body?.data ?? body ?? null;
+        const data = body?.data ?? body ?? null;
+        if (data && typeof data === "object" && accessToken) {
+            data.accessToken = accessToken;
+        }
+        return data;
     } catch (error) {
         console.error("Error fetching user info:", error);
         return null;

@@ -59,7 +59,7 @@ class SocketClientManager {
     const socketUrl = env.client.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000";
 
     this.socket = io(socketUrl, {
-      transports: ["polling", "websocket"],
+      transports: ["websocket", "polling"],
       autoConnect: true,
       reconnection: true,
       reconnectionAttempts: 15,

@@ -18,16 +18,52 @@ instance.interceptors.request.use((config) => {
   if (env.client.NEXT_PUBLIC_PROJECT_ID && !config.headers["x-project-id"]) {
     config.headers["x-project-id"] = env.client.NEXT_PUBLIC_PROJECT_ID;
   }
+
+  if (typeof window !== "undefined") {
+    const commUserId = localStorage.getItem("pulse_comm_user_id");
+    const userId = localStorage.getItem("pulse_user_id");
+    const token = localStorage.getItem("pulse_access_token");
+
+    if (commUserId && !config.headers["x-user-id"]) {
+      config.headers["x-user-id"] = commUserId;
+    } else if (userId && !config.headers["x-user-id"]) {
+      config.headers["x-user-id"] = userId;
+    }
+
+    if (userId && !config.headers["x-external-id"]) {
+      config.headers["x-external-id"] = userId;
+    }
+
+    if (token && !config.headers["Authorization"]) {
+      config.headers["Authorization"] = `Bearer ${token}`;
+    }
+  }
+
   return config;
 });
 
-// Response interceptor to handle session expiry (401)
+// Response interceptor to handle session expiry (401) with protection against infinite reload loops
+let isRedirectingToLogin = false;
+
 instance.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (error.response && error.response.status === 401) {
-      if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
-        window.location.href = "/login";
+      if (typeof window !== "undefined") {
+        const currentPath = window.location.pathname;
+        // Never redirect if already on auth routes
+        if (!currentPath.startsWith("/login") && !currentPath.startsWith("/register") && !isRedirectingToLogin) {
+          // If the user identity was simply missing in headers, do not immediately kill session and loop
+          const hasStoredAuth = localStorage.getItem("pulse_user_id") || localStorage.getItem("pulse_access_token");
+          if (!hasStoredAuth) {
+            isRedirectingToLogin = true;
+            localStorage.removeItem("pulse_user_id");
+            localStorage.removeItem("pulse_external_id");
+            localStorage.removeItem("pulse_access_token");
+            localStorage.removeItem("pulse_comm_user_id");
+            window.location.href = "/login";
+          }
+        }
       }
     }
     return Promise.reject(error);

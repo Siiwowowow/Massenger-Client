@@ -84,7 +84,8 @@ export const loginAction = async (
     return {
       success: true,
       redirectUrl: finalRedirect,
-      user
+      user,
+      accessToken,
     } as any;
   } catch (error: any) {
     console.log(error, "login error");
