@@ -35,6 +35,8 @@ interface ChatHeaderProps {
   typingUserName?: string;
   onBackMobile?: () => void;
   onSearchInChat?: (query: string) => void;
+  onStartCall?: (type: "AUDIO" | "VIDEO") => void;
+  isCallActive?: boolean;
   className?: string;
 }
 
@@ -46,6 +48,8 @@ export function ChatHeader({
   typingUserName,
   onBackMobile,
   onSearchInChat,
+  onStartCall,
+  isCallActive = false,
   className,
 }: ChatHeaderProps) {
   const [infoOpen, setInfoOpen] = useState(false);
@@ -81,11 +85,19 @@ export function ChatHeader({
 
   const participantCount = conversation.participants.length;
 
-  const handleCallPlaceholder = (type: "audio" | "video") => {
-    toast.info(
-      `${type === "video" ? "Video" : "Voice"} calling is coming in a future phase.`,
-      { duration: 2500 }
-    );
+  const handleStartCall = (type: "AUDIO" | "VIDEO") => {
+    if (isCallActive) {
+      toast.warning("A call is already active or in progress.", { duration: 2500 });
+      return;
+    }
+    if (onStartCall) {
+      onStartCall(type);
+    } else {
+      toast.info(
+        `${type === "VIDEO" ? "Video" : "Voice"} calling is not available right now.`,
+        { duration: 2500 }
+      );
+    }
   };
 
   const handleSearchChange = (val: string) => {
@@ -181,7 +193,7 @@ export function ChatHeader({
                   {displayName}
                 </h1>
 
-                <div className="flex items-center gap-1.5 min-h-[16px]">
+                <div className="flex items-center gap-1.5 min-h-4">
                   {isTyping ? (
                     <span className="text-xs text-[#16a34a] font-medium inline-flex items-center gap-1.5 animate-in fade-in duration-150">
                       <span>{typingUserName ? `${typingUserName} is typing...` : "Typing..."}</span>
@@ -228,26 +240,28 @@ export function ChatHeader({
               <Search className="w-4 h-4" />
             </Button>
 
-            {/* 2. Phone Icon (Voice Call - Visual Only) */}
+            {/* 2. Phone Icon (Voice Call) */}
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => handleCallPlaceholder("audio")}
-              className="h-9 w-9 rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 transition-colors"
-              aria-label="Voice call (Coming soon)"
-              title="Voice call (Coming soon)"
+              onClick={() => handleStartCall("AUDIO")}
+              disabled={isCallActive}
+              className="h-9 w-9 rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 transition-colors cursor-pointer"
+              aria-label="Start voice call"
+              title="Start voice call"
             >
               <Phone className="w-4 h-4" />
             </Button>
 
-            {/* 3. Video Icon (Video Call - Visual Only) */}
+            {/* 3. Video Icon (Video Call) */}
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => handleCallPlaceholder("video")}
-              className="h-9 w-9 rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 transition-colors"
-              aria-label="Video call (Coming soon)"
-              title="Video call (Coming soon)"
+              onClick={() => handleStartCall("VIDEO")}
+              disabled={isCallActive}
+              className="h-9 w-9 rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 transition-colors cursor-pointer"
+              aria-label="Start video call"
+              title="Start video call"
             >
               <Video className="w-4 h-4" />
             </Button>

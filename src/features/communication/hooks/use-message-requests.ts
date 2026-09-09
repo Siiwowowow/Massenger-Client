@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/features/communication/hooks/use-message-requests.ts
 "use client";
 

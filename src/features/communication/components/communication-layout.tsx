@@ -26,6 +26,14 @@ import { ChatHeader } from "./chat-header";
 import { MessageList } from "./message-list";
 import { MessageComposer } from "./message-composer";
 import { SettingsDialog } from "./settings-dialog";
+import {
+  useCallSignaling,
+  useCallState,
+  useLiveKitCall,
+  IncomingCallDialog,
+  OutgoingCallDialog,
+  CallOverlay,
+} from "../call";
 import { useUser } from "@/features/user/hooks/useUser";
 import { RefreshCw, MessageSquare, Plus, ShieldCheck, PanelLeftOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -78,6 +86,40 @@ export function CommunicationLayout({ className }: CommunicationLayoutProps = {}
 
   // 1. Initialize Socket Connection & Communication User
   const { commUser, connectionStatus } = useCommunicationSocket();
+
+  // 1.1 Centralized Call Signaling & State
+  const {
+    startCall,
+    acceptCall,
+    rejectCall,
+    cancelCall,
+    endCall,
+  } = useCallSignaling();
+
+  const {
+    callState,
+    activeCall,
+    statusMessage,
+    isRingingIncoming,
+    isRingingOutgoing,
+    isInCall,
+    isCallActiveOrPending,
+  } = useCallState();
+
+  // 1.2 LiveKit Room Connection & Media Lifecycle (Phase 4 Real Media)
+  const {
+    liveKitState,
+    room,
+    mediaState,
+    isMicEnabled,
+    isCameraEnabled,
+    toggleMic,
+    toggleCamera,
+    disconnect: disconnectLiveKit,
+  } = useLiveKitCall({
+    callState,
+    activeCall,
+  });
 
   // 2. Presence tracking
   const {
@@ -371,8 +413,8 @@ export function CommunicationLayout({ className }: CommunicationLayoutProps = {}
         className={cn(
           "h-full shrink-0 border-r border-[#e2e8f0] bg-white transition-all duration-200 z-10",
           isSidebarCollapsed
-            ? "w-[68px] sm:w-[70px]"
-            : "w-full md:w-80 lg:w-[340px] xl:w-[360px]",
+            ? "w-17 sm:w-17.5"
+            : "w-full md:w-80 lg:w-85 xl:w-90",
           isMobileChatOpen && !isSidebarCollapsed ? "hidden md:block" : "block"
         )}
       >
@@ -426,6 +468,30 @@ export function CommunicationLayout({ className }: CommunicationLayoutProps = {}
                 typingUserName={typingUserName}
                 onBackMobile={handleBackMobile}
                 onSearchInChat={setInChatSearch}
+                onStartCall={(type) => {
+                  if (!activeConversation) return;
+                  const receiverInfo =
+                    activeConversation.type === "DIRECT" && otherUserId
+                      ? {
+                          id: otherUserId,
+                          name:
+                            activeConversation.title ||
+                            (activeConversation.participants.find(
+                              (p: any) =>
+                                typeof p !== "string" &&
+                                p.userId !== commUser?.id
+                            ) as any)?.user?.name ||
+                            "Direct Contact",
+                          avatar: otherAvatarUrl,
+                        }
+                      : {
+                          id: activeConversation.id,
+                          name: activeConversation.title || "Contact",
+                          avatar: activeConversation.avatar,
+                        };
+                  startCall(activeConversation.id, type, receiverInfo);
+                }}
+                isCallActive={isCallActiveOrPending}
               />
 
               {/* Message Timeline */}
@@ -462,7 +528,7 @@ export function CommunicationLayout({ className }: CommunicationLayoutProps = {}
             <div className="h-full flex flex-col items-center justify-center p-8 text-center text-slate-500 select-none">
               <div className="relative mb-5">
                 <div className="w-16 h-16 rounded-2xl bg-white border border-[#e2e8f0] text-slate-900 flex items-center justify-center shadow-xs">
-                  <MessageSquare className="w-8 h-8 stroke-[2]" />
+                  <MessageSquare className="w-8 h-8 stroke-2" />
                 </div>
                 <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#9ef01a] border-2 border-white rounded-full shadow-xs" />
               </div>
@@ -510,6 +576,42 @@ export function CommunicationLayout({ className }: CommunicationLayoutProps = {}
 
         {/* Global Settings Dialog */}
         <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+
+        {/* Call Signaling Dialogs and Overlay */}
+        <IncomingCallDialog
+          open={isRingingIncoming}
+          activeCall={activeCall}
+          onAccept={acceptCall}
+          onReject={rejectCall}
+        />
+
+        <OutgoingCallDialog
+          open={isRingingOutgoing}
+          activeCall={activeCall}
+          onCancel={cancelCall}
+        />
+
+        <CallOverlay
+          open={
+            isInCall ||
+            callState === "BUSY" ||
+            (callState === "ENDED" && Boolean(statusMessage))
+          }
+          activeCall={activeCall}
+          callState={callState}
+          statusMessage={statusMessage}
+          liveKitState={liveKitState}
+          room={room}
+          isMicEnabled={isMicEnabled}
+          isCameraEnabled={isCameraEnabled}
+          mediaErrorMessage={mediaState.mediaErrorMessage}
+          onToggleMic={toggleMic}
+          onToggleCamera={toggleCamera}
+          onEndCall={(callId) => {
+            disconnectLiveKit();
+            endCall(callId);
+          }}
+        />
       </div>
   );
 }

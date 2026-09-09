@@ -1,8 +1,9 @@
 import { combineSlices, configureStore } from "@reduxjs/toolkit";
 import { communicationSlice } from "@/features/communication/slices/communicationSlice";
+import { callSlice } from "@/features/communication/call/slices/callSlice";
 
 // RTK combineSlices allows clean slice combination and dynamic injection
-const rootReducer = combineSlices(communicationSlice);
+const rootReducer = combineSlices(communicationSlice, callSlice);
 
 export const makeStore = () => {
   return configureStore({

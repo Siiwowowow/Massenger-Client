@@ -12,6 +12,12 @@ export const REALTIME_EVENTS = {
     CONVERSATION_READ: 'conversation:read',
     TYPING_START: 'typing:start',
     TYPING_STOP: 'typing:stop',
+    // Phase 1: Call Signaling Client Events
+    CALL_START: 'call:start',
+    CALL_ACCEPT: 'call:accept',
+    CALL_REJECT: 'call:reject',
+    CALL_CANCEL: 'call:cancel',
+    CALL_END: 'call:end',
   },
   SERVER: {
     MESSAGE_NEW: 'message:new',
@@ -28,6 +34,14 @@ export const REALTIME_EVENTS = {
     TYPING_STARTED: 'typing:started',
     TYPING_STOPPED: 'typing:stopped',
     SOCKET_ERROR: 'socket:error',
+    // Phase 1: Call Signaling Server Events
+    CALL_INCOMING: 'call:incoming',
+    CALL_ACCEPTED: 'call:accepted',
+    CALL_REJECTED: 'call:rejected',
+    CALL_CANCELLED: 'call:cancelled',
+    CALL_ENDED: 'call:ended',
+    CALL_BUSY: 'call:busy',
+    CALL_ERROR: 'call:error',
   },
 } as const;
 
