@@ -1,5 +1,14 @@
 // src/features/communication/call/services/livekit-call-manager.ts
-import { Room, RoomEvent, ConnectionState, Track } from "livekit-client";
+import {
+  Room,
+  RoomEvent,
+  ConnectionState,
+  Track,
+  RemoteTrack,
+  RemoteTrackPublication,
+  RemoteParticipant,
+  Participant,
+} from "livekit-client";
 import { callService } from "./call.service";
 import {
   CallState,
@@ -47,6 +56,9 @@ export class LiveKitCallManager {
     hasCameraError: false,
     hasMicError: false,
     mediaErrorMessage: null,
+    isAudioPlaybackBlocked: false,
+    isLocalSpeaking: false,
+    isRemoteSpeaking: false,
   };
 
   private stateChangeListeners = new Set<StateChangeCallback>();
@@ -311,6 +323,87 @@ export class LiveKitCallManager {
         }
       });
 
+      // Direct native handling of remote media tracks (ensures sound is audible in DOM)
+      room.on(
+        RoomEvent.TrackSubscribed,
+        (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
+          console.log(
+            `[LiveKitCallManager] TrackSubscribed: kind=${track.kind}, source=${publication.source}, participant=${participant.identity}`
+          );
+
+          if (track.kind === Track.Kind.Audio) {
+            try {
+              const audioElement = track.attach();
+              audioElement.id = `livekit-remote-audio-${participant.identity}`;
+              audioElement.autoplay = true;
+              audioElement.setAttribute("playsinline", "true");
+              audioElement.setAttribute("webkit-playsinline", "true");
+
+              let container = document.getElementById("livekit-audio-container");
+              if (!container) {
+                container = document.createElement("div");
+                container.id = "livekit-audio-container";
+                container.style.position = "fixed";
+                container.style.width = "0px";
+                container.style.height = "0px";
+                container.style.overflow = "hidden";
+                container.style.opacity = "0";
+                container.style.pointerEvents = "none";
+                document.body.appendChild(container);
+              }
+              container.appendChild(audioElement);
+
+              audioElement.play().catch((playErr) => {
+                console.warn(
+                  "[LiveKitCallManager] Remote audio autoplay blocked by browser:",
+                  playErr
+                );
+                this.setMediaState({ isAudioPlaybackBlocked: true });
+              });
+            } catch (attachErr) {
+              console.error("[LiveKitCallManager] Failed to attach remote audio track:", attachErr);
+            }
+          }
+        }
+      );
+
+      room.on(
+        RoomEvent.TrackUnsubscribed,
+        (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
+          console.log(
+            `[LiveKitCallManager] TrackUnsubscribed: kind=${track.kind}, participant=${participant.identity}`
+          );
+          if (track.kind === Track.Kind.Audio) {
+            try {
+              track.detach().forEach((el) => el.remove());
+              const existing = document.getElementById(`livekit-remote-audio-${participant.identity}`);
+              if (existing) {
+                existing.remove();
+              }
+            } catch (detachErr) {
+              console.warn("[LiveKitCallManager] Track detach warning:", detachErr);
+            }
+          }
+        }
+      );
+
+      // Autoplay unlock tracking
+      room.on(RoomEvent.AudioPlaybackStatusChanged, () => {
+        const canPlay = room.canPlaybackAudio;
+        console.log("[LiveKitCallManager] AudioPlaybackStatusChanged: canPlaybackAudio =", canPlay);
+        this.setMediaState({ isAudioPlaybackBlocked: !canPlay });
+      });
+
+      // Real-time speaking detection for visual feedback
+      room.on(RoomEvent.ActiveSpeakersChanged, (speakers: Participant[]) => {
+        const isLocalSpeaking = speakers.some((s) => s.isLocal);
+        const isRemoteSpeaking = speakers.some((s) => !s.isLocal);
+        this.setMediaState({
+          isLocalSpeaking,
+          isRemoteSpeaking,
+        });
+      });
+
       // 7. Connect Room with autoSubscribe: true to receive remote media
       await room.connect(targetUrl, token, {
         autoSubscribe: true,
@@ -333,7 +426,11 @@ export class LiveKitCallManager {
       if (callType === "AUDIO") {
         // AUDIO CALL: Publish microphone only. Camera is NEVER requested or published.
         try {
-          await room.localParticipant.setMicrophoneEnabled(true);
+          await room.localParticipant.setMicrophoneEnabled(true, {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          });
           this.setMediaState({
             isMicEnabled: true,
             isCameraEnabled: false,
@@ -500,6 +597,55 @@ export class LiveKitCallManager {
   }
 
   /**
+   * Unlock or resume audio context and LiveKit room audio playback.
+   * Safely called on user gestures (e.g. click accept, click unmute).
+   */
+  public async unlockAudio(): Promise<boolean> {
+    if (typeof window !== "undefined") {
+      try {
+        const AudioContextClass =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        if (AudioContextClass) {
+          const ctx = new AudioContextClass();
+          if (ctx.state === "suspended") {
+            await ctx.resume();
+          }
+          ctx.close().catch(() => {});
+        }
+      } catch {
+        // Safe fallback
+      }
+    }
+
+    if (this.room) {
+      try {
+        await this.room.startAudio();
+        this.setMediaState({ isAudioPlaybackBlocked: false });
+        const container = document.getElementById("livekit-audio-container");
+        if (container) {
+          const audios = container.querySelectorAll("audio");
+          audios.forEach((el) => {
+            el.play().catch(() => {});
+          });
+        }
+        return true;
+      } catch (err) {
+        console.warn("[LiveKitCallManager] unlockAudio failed:", err);
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Start or resume audio playback manually
+   */
+  public async startAudio(): Promise<boolean> {
+    return this.unlockAudio();
+  }
+
+  /**
    * Cleanly disconnect the room and release all listeners and media tracks
    */
   public disconnect(): void {
@@ -564,12 +710,22 @@ export class LiveKitCallManager {
       this.room = null;
     }
 
+    if (typeof document !== "undefined") {
+      const container = document.getElementById("livekit-audio-container");
+      if (container) {
+        container.innerHTML = "";
+      }
+    }
+
     this.setMediaState({
       isMicEnabled: false,
       isCameraEnabled: false,
       hasMicError: false,
       hasCameraError: false,
       mediaErrorMessage: null,
+      isAudioPlaybackBlocked: false,
+      isLocalSpeaking: false,
+      isRemoteSpeaking: false,
     });
 
     this.notifyError(null);

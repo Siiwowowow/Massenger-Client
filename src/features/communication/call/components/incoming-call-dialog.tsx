@@ -11,6 +11,7 @@ import {
 import { CallAvatar } from "./call-avatar";
 import { CallControls } from "./call-controls";
 import { ActiveCallSession } from "../types/call.types";
+import { liveKitCallManager } from "../services/livekit-call-manager";
 import { Phone, Video } from "lucide-react";
 
 interface IncomingCallDialogProps {
@@ -34,6 +35,7 @@ export function IncomingCallDialog({
 
   const handleAccept = () => {
     if (activeCall.callId) {
+      liveKitCallManager.unlockAudio().catch(() => {});
       onAccept(activeCall.callId);
     }
   };

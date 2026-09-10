@@ -28,6 +28,7 @@ export interface UseLiveKitCallReturn {
   toggleMic: () => Promise<boolean>;
   toggleCamera: () => Promise<boolean>;
   disconnect: () => void;
+  startAudio: () => Promise<boolean>;
 }
 
 /**
@@ -127,6 +128,10 @@ export function useLiveKitCall({
     liveKitCallManager.disconnect();
   }, []);
 
+  const startAudio = useCallback(async () => {
+    return liveKitCallManager.startAudio();
+  }, []);
+
   return {
     liveKitState,
     room: liveKitCallManager.getRoom(),
@@ -137,6 +142,7 @@ export function useLiveKitCall({
     toggleMic,
     toggleCamera,
     disconnect,
+    startAudio,
   };
 }
 

@@ -116,6 +116,7 @@ export function CommunicationLayout({ className }: CommunicationLayoutProps = {}
     toggleMic,
     toggleCamera,
     disconnect: disconnectLiveKit,
+    startAudio,
   } = useLiveKitCall({
     callState,
     activeCall,
@@ -605,6 +606,10 @@ export function CommunicationLayout({ className }: CommunicationLayoutProps = {}
           isMicEnabled={isMicEnabled}
           isCameraEnabled={isCameraEnabled}
           mediaErrorMessage={mediaState.mediaErrorMessage}
+          isAudioPlaybackBlocked={mediaState.isAudioPlaybackBlocked}
+          isLocalSpeaking={mediaState.isLocalSpeaking}
+          isRemoteSpeaking={mediaState.isRemoteSpeaking}
+          onStartAudio={startAudio}
           onToggleMic={toggleMic}
           onToggleCamera={toggleCamera}
           onEndCall={(callId) => {

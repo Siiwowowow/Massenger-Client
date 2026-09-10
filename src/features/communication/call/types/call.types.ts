@@ -24,6 +24,9 @@ export interface CallMediaState {
   hasCameraError?: boolean;
   hasMicError?: boolean;
   mediaErrorMessage?: string | null;
+  isAudioPlaybackBlocked?: boolean;
+  isLocalSpeaking?: boolean;
+  isRemoteSpeaking?: boolean;
 }
 
 export interface CallParticipantInfo {
