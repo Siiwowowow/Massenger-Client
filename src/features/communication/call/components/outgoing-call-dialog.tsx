@@ -1,7 +1,7 @@
 // src/features/communication/call/components/outgoing-call-dialog.tsx
 "use client";
 
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -24,11 +24,65 @@ export function OutgoingCallDialog({
   activeCall,
   onCancel,
 }: OutgoingCallDialogProps) {
+  const previewRef = useRef<HTMLVideoElement>(null);
+  const previewStreamRef = useRef<MediaStream | null>(null);
+  const [isPreviewReady, setIsPreviewReady] = useState(false);
+  const [previewError, setPreviewError] = useState(false);
+  const isVideo = activeCall?.callType === "VIDEO";
+
+  useEffect(() => {
+    if (!open || !isVideo || typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      return;
+    }
+
+    const previewElement = previewRef.current;
+    let isCancelled = false;
+
+    const startPreview = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user" },
+          audio: false,
+        });
+
+        if (isCancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
+        previewStreamRef.current = stream;
+        setPreviewError(false);
+        setIsPreviewReady(true);
+
+        if (previewElement) {
+          previewElement.srcObject = stream;
+          await previewElement.play().catch(() => undefined);
+        }
+      } catch {
+        if (!isCancelled) {
+          setIsPreviewReady(false);
+          setPreviewError(true);
+        }
+      }
+    };
+
+    void startPreview();
+
+    return () => {
+      isCancelled = true;
+      previewStreamRef.current?.getTracks().forEach((track) => track.stop());
+      previewStreamRef.current = null;
+      if (previewElement) {
+        previewElement.srcObject = null;
+      }
+      setIsPreviewReady(false);
+    };
+  }, [open, isVideo]);
+
   if (!activeCall) return null;
 
   const calleeName = activeCall.receiver?.name || "User";
   const calleeAvatar = activeCall.receiver?.avatar;
-  const isVideo = activeCall.callType === "VIDEO";
 
   const handleCancel = () => {
     onCancel(activeCall.callId || undefined);
@@ -57,20 +111,36 @@ export function OutgoingCallDialog({
           <span>OUTGOING {isVideo ? "VIDEO" : "AUDIO"} CALL</span>
         </div>
 
-        {/* Video Mode Placeholder Area (Phase 1 tasteful placeholder, no fake camera) */}
+        {/* Local camera preview while the other participant is being notified */}
         {isVideo ? (
-          <div className="w-full relative rounded-2xl bg-slate-900/90 border border-slate-800 p-6 flex flex-col items-center justify-center my-2 overflow-hidden shadow-inner">
-            <div className="relative mb-3">
-              <CallAvatar
-                name={calleeName}
-                avatarUrl={calleeAvatar}
-                size="lg"
-                isPulsing={true}
+          <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-slate-950 shadow-inner my-2">
+            {isPreviewReady ? (
+              <video
+                ref={previewRef}
+                autoPlay
+                muted
+                playsInline
+                className="h-full w-full object-cover -scale-x-100"
+                aria-label="Your camera preview"
               />
-            </div>
-            <div className="flex items-center gap-2 text-xs text-slate-400 bg-black/40 px-3 py-1.5 rounded-full border border-white/5">
-              <VideoOff className="w-3.5 h-3.5 text-slate-400" />
-              <span>Camera connects after call is accepted</span>
+            ) : (
+              <div className="flex h-full flex-col items-center justify-center gap-3 p-6">
+                <CallAvatar name="You" size="lg" isPulsing={!previewError} />
+                <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/40 px-3 py-1.5 text-xs text-slate-300">
+                  <VideoOff className="h-3.5 w-3.5 text-slate-400" />
+                  <span>{previewError ? "Camera permission is required" : "Starting camera..."}</span>
+                </div>
+              </div>
+            )}
+
+            <div className="absolute inset-x-3 bottom-3 flex items-end justify-between gap-3">
+              <div className="rounded-full bg-black/60 px-3 py-1.5 text-left text-xs text-white backdrop-blur-sm">
+                <span className="font-medium">You</span>
+                <span className="ml-2 text-slate-300">Camera preview</span>
+              </div>
+              <div className="rounded-full bg-black/60 px-3 py-1.5 text-xs text-slate-200 backdrop-blur-sm">
+                Waiting for {calleeName}
+              </div>
             </div>
           </div>
         ) : (
