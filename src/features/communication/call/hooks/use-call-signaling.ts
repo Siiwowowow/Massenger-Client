@@ -29,7 +29,6 @@ import {
   CallErrorPayload,
 } from "../types/call.types";
 import { toast } from "sonner";
-import { liveKitCallManager } from "../services/livekit-call-manager";
 
 export function useCallSignaling() {
   const dispatch = useAppDispatch();
@@ -217,8 +216,7 @@ export function useCallSignaling() {
       }
 
       clearAutoResetTimer();
-      liveKitCallManager.unlockAudio().catch(() => {});
-
+      
       // Optimistically enter outgoing ringing state with callee details
       dispatch(
         initiateOutgoingCall({
@@ -297,8 +295,7 @@ export function useCallSignaling() {
       }
 
       clearAutoResetTimer();
-      liveKitCallManager.unlockAudio().catch(() => {});
-      dispatch(setCallAccepted({ callId }));
+            dispatch(setCallAccepted({ callId }));
 
       try {
         const socket = socketClient.getSocket();

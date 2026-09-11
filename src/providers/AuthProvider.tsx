@@ -23,6 +23,7 @@ export function AuthProvider({
     const [user, setUser] = useState<ICurrentUser | null>(initialUser);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setUser(initialUser);
         if (typeof window !== "undefined") {
             if (initialUser?.id) {

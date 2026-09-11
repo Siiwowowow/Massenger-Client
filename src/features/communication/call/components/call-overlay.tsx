@@ -2,8 +2,7 @@
 "use client";
 
 import React, { useState } from "react";
-import {
-  Dialog,
+import { Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
@@ -37,6 +36,7 @@ import {
   RoomContext,
   VideoTrack,
   useTracks,
+  RoomAudioRenderer,
 } from "@livekit/components-react";
 
 interface CallOverlayProps {
@@ -460,6 +460,7 @@ export function CallOverlay({
         <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 text-center relative overflow-hidden">
           {room ? (
             <RoomContext.Provider value={room}>
+              <RoomAudioRenderer />
               {isVideo ? (
                 <VideoStageContent
                   participantName={participantName}
