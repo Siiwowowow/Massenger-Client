@@ -26,6 +26,7 @@ export function OutgoingCallDialog({
 }: OutgoingCallDialogProps) {
   const previewRef = useRef<HTMLVideoElement>(null);
   const previewStreamRef = useRef<MediaStream | null>(null);
+  const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
   const [isPreviewReady, setIsPreviewReady] = useState(false);
   const [previewError, setPreviewError] = useState(false);
   const isVideo = activeCall?.callType === "VIDEO";
@@ -35,7 +36,6 @@ export function OutgoingCallDialog({
       return;
     }
 
-    const previewElement = previewRef.current;
     let isCancelled = false;
 
     const startPreview = async () => {
@@ -51,13 +51,9 @@ export function OutgoingCallDialog({
         }
 
         previewStreamRef.current = stream;
+        setPreviewStream(stream);
         setPreviewError(false);
         setIsPreviewReady(true);
-
-        if (previewElement) {
-          previewElement.srcObject = stream;
-          await previewElement.play().catch(() => undefined);
-        }
       } catch {
         if (!isCancelled) {
           setIsPreviewReady(false);
@@ -72,12 +68,22 @@ export function OutgoingCallDialog({
       isCancelled = true;
       previewStreamRef.current?.getTracks().forEach((track) => track.stop());
       previewStreamRef.current = null;
-      if (previewElement) {
-        previewElement.srcObject = null;
-      }
+      setPreviewStream(null);
       setIsPreviewReady(false);
     };
   }, [open, isVideo]);
+
+  useEffect(() => {
+    const previewElement = previewRef.current;
+    if (!previewElement || !previewStream) return;
+
+    previewElement.srcObject = previewStream;
+    void previewElement.play().catch(() => undefined);
+
+    return () => {
+      previewElement.srcObject = null;
+    };
+  }, [previewStream]);
 
   if (!activeCall) return null;
 
