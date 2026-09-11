@@ -1,7 +1,7 @@
 // src/features/communication/call/components/call-overlay.tsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { Dialog,
   DialogContent,
   DialogDescription,
@@ -30,7 +30,7 @@ import {
   MicOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Room, Track } from "livekit-client";
+import { Room, RoomEvent, Track } from "livekit-client";
 import {
   RoomContext,
   VideoTrack,
@@ -81,6 +81,26 @@ function VideoStageContent({
   isCameraEnabled: boolean;
 }) {
   const [isLocalMain, setIsLocalMain] = useState(false);
+  const [, refreshTracks] = useState(0);
+  const room = useContext(RoomContext);
+
+  useEffect(() => {
+    if (!room) return;
+
+    const refresh = () => refreshTracks((value) => value + 1);
+    room.on(RoomEvent.TrackSubscribed, refresh);
+    room.on(RoomEvent.TrackUnsubscribed, refresh);
+    room.on(RoomEvent.LocalTrackPublished, refresh);
+    room.on(RoomEvent.LocalTrackUnpublished, refresh);
+
+    return () => {
+      room.off(RoomEvent.TrackSubscribed, refresh);
+      room.off(RoomEvent.TrackUnsubscribed, refresh);
+      room.off(RoomEvent.LocalTrackPublished, refresh);
+      room.off(RoomEvent.LocalTrackUnpublished, refresh);
+    };
+  }, [room]);
+
   const tracks = useTracks([Track.Source.Camera], { onlySubscribed: false });
   const localTrack = tracks.find((t) => t.participant.isLocal);
   const remoteTrack = tracks.find((t) => !t.participant.isLocal);
