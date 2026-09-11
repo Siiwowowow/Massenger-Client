@@ -33,7 +33,7 @@ import { cn } from "@/lib/utils";
 import { Room, RoomEvent, Track } from "livekit-client";
 import {
   RoomContext,
-  VideoTrack,
+  type TrackReference,
   useTracks,
 } from "@livekit/components-react";
 
@@ -127,14 +127,19 @@ function VideoStageContent({
   const mainName = isLocalMain ? "You" : participantName;
   const canSwapVideos = isLocalVideoActive && isRemoteVideoActive;
 
+  const renderVideo = (trackRef: TrackReference, mirrored: boolean, className: string) => (
+    <AttachedVideo
+      trackRef={trackRef}
+      mirrored={mirrored}
+      className={className}
+    />
+  );
+
   return (
     <div className="w-full h-full relative flex items-center justify-center bg-slate-950 overflow-hidden rounded-2xl border border-white/10 shadow-inner">
       {/* Main video stage */}
       {isMainVideoActive && mainTrack ? (
-        <VideoTrack
-          trackRef={mainTrack}
-          className="w-full h-full object-cover"
-        />
+        renderVideo(mainTrack, isLocalMain, "w-full h-full object-cover")
       ) : (
         <div className="flex flex-col items-center justify-center p-6 text-center z-10">
           <div className="relative mb-4">
@@ -184,13 +189,11 @@ function VideoStageContent({
         title={canSwapVideos ? "Swap video size" : undefined}
       >
         {isPipVideoActive && pipTrack ? (
-          <VideoTrack
-            trackRef={pipTrack}
-            className={cn(
-              "w-full h-full object-cover",
-              isLocalMain && "-scale-x-100"
-            )}
-          />
+          renderVideo(
+            pipTrack,
+            !isLocalMain,
+            "w-full h-full object-cover"
+          )
         ) : (
           <div className="flex flex-col items-center justify-center p-3 text-center">
             <CallAvatar name={isLocalMain ? participantName : "You"} size="sm" />
@@ -202,6 +205,45 @@ function VideoStageContent({
         )}
       </button>
     </div>
+  );
+}
+
+function AttachedVideo({
+  trackRef,
+  mirrored,
+  className,
+}: {
+  trackRef: TrackReference;
+  mirrored: boolean;
+  className: string;
+}) {
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+  const track = trackRef.publication.track;
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !track) return;
+
+    track.attach(video);
+    video.autoplay = true;
+    video.muted = trackRef.participant.isLocal;
+    video.playsInline = true;
+    void video.play().catch(() => undefined);
+
+    return () => {
+      track.detach(video);
+    };
+  }, [track, trackRef.participant.isLocal]);
+
+  return (
+    <video
+      ref={videoRef}
+      autoPlay
+      muted={trackRef.participant.isLocal}
+      playsInline
+      className={cn(className, mirrored && "-scale-x-100")}
+      aria-label={trackRef.participant.isLocal ? "Your video" : "Participant video"}
+    />
   );
 }
 
