@@ -141,25 +141,23 @@ export function CallControls({
 
       {/* Real Video Toggle - Only displayed for VIDEO calls */}
       {isVideoCall && (
-        <button
-          type="button"
-          onClick={onToggleCamera}
-          disabled={disabled}
-          aria-label={isCameraEnabled ? "Turn off camera" : "Turn on camera"}
-          title={isCameraEnabled ? "Turn off camera" : "Turn on camera"}
-          className={cn(
-            "w-12 h-12 rounded-full flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9ef01a]",
-            isCameraEnabled
-              ? "bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white"
-              : "bg-rose-500/25 hover:bg-rose-500/35 text-rose-400 border border-rose-500/40"
-          )}
-        >
-          {isCameraEnabled ? (
-            <Video className="w-5 h-5 stroke-2" />
-          ) : (
-            <VideoOff className="w-5 h-5 stroke-[2.2]" />
-          )}
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={onToggleCamera}
+            disabled={disabled}
+            aria-label={isCameraEnabled ? "Turn off camera" : "Turn on camera"}
+            title={isCameraEnabled ? "Turn off camera" : "Turn on camera"}
+            className={cn(
+              "w-12 h-12 rounded-full flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9ef01a]",
+              isCameraEnabled
+                ? "bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white"
+                : "bg-rose-500/25 hover:bg-rose-500/35 text-rose-400 border border-rose-500/40"
+            )}
+          >
+            {isCameraEnabled ? <Video className="w-5 h-5 stroke-2" /> : <VideoOff className="w-5 h-5 stroke-[2.2]" />}
+          </button>
+        </>
       )}
 
       {/* End Call Button */}

@@ -34,6 +34,7 @@ import {
   OutgoingCallDialog,
   CallOverlay,
 } from "../call";
+import { useCallRingtone } from "../call/hooks/use-call-ringtone";
 import { useUser } from "@/features/user/hooks/useUser";
 import { RefreshCw, MessageSquare, Plus, ShieldCheck, PanelLeftOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -105,6 +106,11 @@ export function CommunicationLayout({ className }: CommunicationLayoutProps = {}
     isInCall,
     isCallActiveOrPending,
   } = useCallState();
+
+  useCallRingtone({
+    incoming: isRingingIncoming,
+    outgoing: isRingingOutgoing,
+  });
 
   // 1.2 LiveKit Room Connection & Media Lifecycle (Phase 4 Real Media)
   const {

@@ -17,7 +17,6 @@ import {
 } from "../types/call.types";
 import {
   Maximize2,
-  Minimize2,
   Phone,
   Video,
   VideoOff,
@@ -36,7 +35,6 @@ import {
   RoomContext,
   VideoTrack,
   useTracks,
-  RoomAudioRenderer,
 } from "@livekit/components-react";
 
 interface CallOverlayProps {
@@ -82,6 +80,7 @@ function VideoStageContent({
   liveKitState?: LiveKitConnectionState;
   isCameraEnabled: boolean;
 }) {
+  const [isLocalMain, setIsLocalMain] = useState(false);
   const tracks = useTracks([Track.Source.Camera], { onlySubscribed: false });
   const localTrack = tracks.find((t) => t.participant.isLocal);
   const remoteTrack = tracks.find((t) => !t.participant.isLocal);
@@ -101,12 +100,19 @@ function VideoStageContent({
     localTrack.publication.track
   );
 
+  const mainTrack = isLocalMain ? localTrack : remoteTrack;
+  const pipTrack = isLocalMain ? remoteTrack : localTrack;
+  const isMainVideoActive = isLocalMain ? isLocalVideoActive : isRemoteVideoActive;
+  const isPipVideoActive = isLocalMain ? isRemoteVideoActive : isLocalVideoActive;
+  const mainName = isLocalMain ? "You" : participantName;
+  const canSwapVideos = isLocalVideoActive && isRemoteVideoActive;
+
   return (
     <div className="w-full h-full relative flex items-center justify-center bg-slate-950 overflow-hidden rounded-2xl border border-white/10 shadow-inner">
-      {/* Remote Video Track or Clear Waiting / Avatar State */}
-      {isRemoteVideoActive && remoteTrack ? (
+      {/* Main video stage */}
+      {isMainVideoActive && mainTrack ? (
         <VideoTrack
-          trackRef={remoteTrack}
+          trackRef={mainTrack}
           className="w-full h-full object-cover"
         />
       ) : (
@@ -120,7 +126,7 @@ function VideoStageContent({
             />
           </div>
           <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-            {participantName}
+            {mainName}
           </h3>
 
           <div className="mt-2">
@@ -135,31 +141,46 @@ function VideoStageContent({
           <div className="mt-4 px-3.5 py-1.5 rounded-full bg-slate-900/80 backdrop-blur-md border border-white/10 text-xs text-slate-300 flex items-center gap-2">
             <VideoOff className="w-3.5 h-3.5 text-slate-400" />
             <span>
-              {remoteTrack
-                ? "Remote camera is turned off"
+              {isLocalMain
+                ? "Your camera is turned off"
+                : remoteTrack
+                  ? "Remote camera is turned off"
                 : "Waiting for participant's video..."}
             </span>
           </div>
         </div>
       )}
 
-      {/* Floating Local PIP Preview (Top-Right, Mirrored) */}
-      <div className="absolute top-4 right-4 w-32 h-44 sm:w-40 sm:h-52 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20 z-20 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center transition-all">
-        {isLocalVideoActive && localTrack ? (
+      {/* Floating secondary video preview; clicking it swaps the main stage */}
+      <button
+        type="button"
+        onClick={() => canSwapVideos && setIsLocalMain((current) => !current)}
+        disabled={!canSwapVideos}
+        className={cn(
+          "absolute top-4 right-4 w-32 h-44 sm:w-40 sm:h-52 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20 z-20 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9ef01a]",
+          canSwapVideos ? "cursor-pointer hover:border-[#9ef01a]" : "cursor-default"
+        )}
+        aria-label={`Show ${isLocalMain ? participantName : "your"} video larger`}
+        title={canSwapVideos ? "Swap video size" : undefined}
+      >
+        {isPipVideoActive && pipTrack ? (
           <VideoTrack
-            trackRef={localTrack}
-            className="w-full h-full object-cover -scale-x-100"
+            trackRef={pipTrack}
+            className={cn(
+              "w-full h-full object-cover",
+              isLocalMain && "-scale-x-100"
+            )}
           />
         ) : (
           <div className="flex flex-col items-center justify-center p-3 text-center">
-            <CallAvatar name="You" size="sm" />
+            <CallAvatar name={isLocalMain ? participantName : "You"} size="sm" />
             <div className="mt-2 flex items-center gap-1 text-[11px] text-slate-400">
               <VideoOff className="w-3.5 h-3.5 text-rose-400" />
-              <span>Camera off</span>
+              <span>{isLocalMain ? "Remote camera off" : "Camera off"}</span>
             </div>
           </div>
         )}
-      </div>
+      </button>
     </div>
   );
 }
@@ -414,21 +435,10 @@ export function CallOverlay({
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setIsMinimized(true)}
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white transition-colors cursor-pointer"
-              aria-label="Minimize call window"
-              title="Minimize to floating window"
-            >
-              <Minimize2 className="w-4 h-4" />
-            </button>
-          </div>
         </div>
 
         {/* Browser Autoplay Blocked Banner */}
-        {isAudioPlaybackBlocked && (
+        {callState === "ACCEPTED" && !isVideo && (
           <div
             onClick={onStartAudio}
             className="px-4 py-2.5 bg-amber-500/25 hover:bg-amber-500/35 cursor-pointer border-b border-amber-500/40 text-amber-200 text-xs flex items-center justify-between gap-2 z-20 transition-colors select-none"
@@ -436,7 +446,9 @@ export function CallOverlay({
             <div className="flex items-center gap-2">
               <Volume2 className="w-4 h-4 text-amber-300 shrink-0 animate-bounce" />
               <span>
-                Audio is paused by browser policy. <strong>Click anywhere here to enable sound.</strong>
+                {isAudioPlaybackBlocked
+                  ? <>Audio is paused by browser policy. <strong>Tap here to enable sound.</strong></>
+                  : <><strong>Tap here to enable call sound.</strong></>}
               </span>
             </div>
             <button
@@ -460,7 +472,6 @@ export function CallOverlay({
         <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 text-center relative overflow-hidden">
           {room ? (
             <RoomContext.Provider value={room}>
-              <RoomAudioRenderer />
               {isVideo ? (
                 <VideoStageContent
                   participantName={participantName}

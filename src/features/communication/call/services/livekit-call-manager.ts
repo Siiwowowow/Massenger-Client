@@ -49,6 +49,7 @@ export class LiveKitCallManager {
   private connectedCallId: string | null = null;
   private activeCallId: string | null = null;
   private currentCallType: CallType = "AUDIO";
+  private remoteAudioElements = new Map<string, HTMLAudioElement[]>();
 
   private mediaState: CallMediaState = {
     isMicEnabled: false,
@@ -331,7 +332,24 @@ export class LiveKitCallManager {
           console.log(`[LiveKitCallManager DIAGNOSTICS] Remote audio publication count for ${participant.identity}: ${participant.audioTrackPublications.size}`);
 
           if (track.kind === Track.Kind.Audio) {
-            // Handled automatically by <RoomAudioRenderer /> in React.
+            const attachedElement = track.attach();
+            const audioElements = (Array.isArray(attachedElement) ? attachedElement : [attachedElement]).filter(
+              (element): element is HTMLAudioElement => element instanceof HTMLAudioElement,
+            );
+            const trackKey = participant.identity;
+
+            audioElements.forEach((element) => {
+              element.autoplay = true;
+              element.controls = false;
+              element.setAttribute("aria-hidden", "true");
+              element.style.display = "none";
+              document.body.appendChild(element);
+              void element.play().catch(() => {
+                this.setMediaState({ isAudioPlaybackBlocked: true });
+              });
+            });
+
+            this.remoteAudioElements.set(trackKey, audioElements);
           }
         }
       );
@@ -343,7 +361,10 @@ export class LiveKitCallManager {
             `[LiveKitCallManager] TrackUnsubscribed: kind=${track.kind}, participant=${participant.identity}`
           );
           if (track.kind === Track.Kind.Audio) {
-            // Handled automatically by <RoomAudioRenderer /> in React.
+            track.detach().forEach((element) => element.remove());
+            const trackKey = participant.identity;
+            this.remoteAudioElements.get(trackKey)?.forEach((element) => element.remove());
+            this.remoteAudioElements.delete(trackKey);
           }
         }
       );
@@ -379,8 +400,11 @@ export class LiveKitCallManager {
       // 8. Unlock Audio Playback for Browser Autoplay Policies
       try {
         await room.startAudio();
+        this.setMediaState({ isAudioPlaybackBlocked: !room.canPlaybackAudio });
       } catch (audioErr) {
         console.warn("[LiveKitCallManager] startAudio warning:", audioErr);
+        // Mobile browsers require a user gesture before remote audio can play.
+        this.setMediaState({ isAudioPlaybackBlocked: true });
       }
 
       // 9. Publish Real Media Tracks based on CallType
@@ -539,6 +563,31 @@ export class LiveKitCallManager {
     }
   }
 
+  /** Switch between available front/back camera devices during a video call. */
+  public async switchCamera(): Promise<boolean> {
+    if (this.currentCallType !== "VIDEO" || !this.room || this.connectionState !== "CONNECTED") {
+      return false;
+    }
+
+    try {
+      const devices = (await navigator.mediaDevices.enumerateDevices()).filter(
+        (device) => device.kind === "videoinput",
+      );
+      if (devices.length < 2) return false;
+
+      const publication = this.room.localParticipant.getTrackPublication(Track.Source.Camera);
+      const currentDeviceId = publication?.track?.mediaStreamTrack?.getSettings().deviceId;
+      const currentIndex = devices.findIndex((device) => device.deviceId === currentDeviceId);
+      const nextDevice = devices[(currentIndex + 1) % devices.length];
+
+      await this.room.switchActiveDevice("videoinput", nextDevice.deviceId);
+      return true;
+    } catch (err) {
+      console.error("[LiveKitCallManager] switchCamera error:", err);
+      return false;
+    }
+  }
+
   /**
    * Returns current microphone state
    */
@@ -572,8 +621,14 @@ export class LiveKitCallManager {
     }
     try {
       await this.room.startAudio();
-      this.setMediaState({ isAudioPlaybackBlocked: false });
-      return true;
+      const playbackResults = await Promise.all(
+        [...this.remoteAudioElements.values()].flat().map((element) =>
+          element.play().then(() => true).catch(() => false),
+        ),
+      );
+      const isBlocked = !this.room.canPlaybackAudio || playbackResults.includes(false);
+      this.setMediaState({ isAudioPlaybackBlocked: isBlocked });
+      return !isBlocked;
     } catch (err) {
       console.warn('[LiveKitCallManager] Failed to start audio:', err);
       this.setMediaState({ isAudioPlaybackBlocked: true });
@@ -591,6 +646,11 @@ export class LiveKitCallManager {
 
     if (this.room) {
       try {
+        this.remoteAudioElements.forEach((elements) => {
+          elements.forEach((element) => element.remove());
+        });
+        this.remoteAudioElements.clear();
+
         // Requirement 3 & 11: Release hardware tracks explicitly so LEDs turn off unconditionally
         const local = this.room.localParticipant;
         if (local) {

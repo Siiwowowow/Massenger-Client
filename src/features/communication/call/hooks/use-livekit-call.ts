@@ -27,6 +27,7 @@ export interface UseLiveKitCallReturn {
   isCameraEnabled: boolean;
   toggleMic: () => Promise<boolean>;
   toggleCamera: () => Promise<boolean>;
+  switchCamera: () => Promise<boolean>;
   disconnect: () => void;
   startAudio: () => Promise<boolean>;
 }
@@ -124,6 +125,10 @@ export function useLiveKitCall({
     return liveKitCallManager.toggleCamera();
   }, []);
 
+  const switchCamera = useCallback(async () => {
+    return liveKitCallManager.switchCamera();
+  }, []);
+
   const disconnect = useCallback(() => {
     liveKitCallManager.disconnect();
   }, []);
@@ -141,6 +146,7 @@ export function useLiveKitCall({
     isCameraEnabled: mediaState.isCameraEnabled,
     toggleMic,
     toggleCamera,
+    switchCamera,
     disconnect,
     startAudio,
   };
