@@ -48,8 +48,9 @@ export function IncomingCallDialog({
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent
         showCloseButton={false}
-        className="max-w-sm sm:max-w-md w-[92vw] bg-[#111b21] text-white border-[#222e35] p-6 sm:p-8 rounded-3xl shadow-2xl flex flex-col items-center text-center overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        className="max-w-sm sm:max-w-md w-[92vw] bg-linear-to-b from-[#1a2328] to-[#111b21] text-white border border-[#2a363d]/50 p-6 sm:p-8 rounded-[2rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.8)] flex flex-col items-center text-center overflow-hidden animate-in fade-in zoom-in-95 duration-300"
       >
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-[#9ef01a]/10 via-transparent to-transparent pointer-events-none" />
         <DialogTitle className="sr-only">
           Incoming {isVideo ? "Video" : "Audio"} Call from {callerName}
         </DialogTitle>
@@ -58,17 +59,19 @@ export function IncomingCallDialog({
         </DialogDescription>
 
         {/* Top Header Badge */}
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-xs font-semibold text-[#9ef01a] tracking-wide mb-6">
+        <div className="z-10 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-semibold text-[#9ef01a] tracking-wide mb-6 shadow-sm backdrop-blur-md">
           {isVideo ? (
-            <Video className="w-3.5 h-3.5" />
+            <Video className="w-3.5 h-3.5 animate-pulse" />
           ) : (
-            <Phone className="w-3.5 h-3.5" />
+            <Phone className="w-3.5 h-3.5 animate-pulse" />
           )}
           <span>INCOMING {isVideo ? "VIDEO" : "AUDIO"} CALL</span>
         </div>
 
         {/* Pulsing Avatar */}
-        <div className="my-2">
+        <div className="z-10 my-4 relative">
+          <div className="absolute inset-0 rounded-full animate-ping bg-[#9ef01a]/20 scale-150" />
+          <div className="absolute inset-0 rounded-full animate-pulse bg-[#9ef01a]/30 scale-125" />
           <CallAvatar
             name={callerName}
             avatarUrl={callerAvatar}
@@ -78,15 +81,15 @@ export function IncomingCallDialog({
         </div>
 
         {/* Caller Information */}
-        <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight mt-4">
+        <h2 className="z-10 text-2xl sm:text-3xl font-bold text-white tracking-tight mt-6">
           {callerName}
         </h2>
-        <p className="text-xs sm:text-sm text-slate-400 mt-1">
-          Pulse Messenger {isVideo ? "video" : "audio"} call...
+        <p className="z-10 text-sm sm:text-base text-slate-400 mt-2 font-medium">
+          {callerName} is calling you
         </p>
 
         {/* Action Controls */}
-        <div className="w-full mt-6 sm:mt-8">
+        <div className="z-10 w-full mt-8 sm:mt-10">
           <CallControls
             mode="incoming"
             onAccept={handleAccept}

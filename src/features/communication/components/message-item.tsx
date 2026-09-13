@@ -24,6 +24,7 @@ import {
   Play,
   Pause,
   Copy,
+  PhoneMissed,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -91,6 +92,18 @@ export function MessageItem({
     .toUpperCase();
 
   const isAudioMessage = message.type === "AUDIO" || message.content?.startsWith("🎤 [Voice Note]");
+
+  if (message.type === "SYSTEM") {
+    return (
+      <div className="flex justify-center my-3 select-none">
+        <div className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3.5 py-1.5 text-xs font-medium text-rose-700 shadow-2xs">
+          <PhoneMissed className="h-3.5 w-3.5" />
+          <span>{message.content}</span>
+          <span className="text-[10px] text-rose-400">{formattedTime}</span>
+        </div>
+      </div>
+    );
+  }
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content || "");

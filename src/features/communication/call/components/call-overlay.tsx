@@ -1,7 +1,8 @@
 // src/features/communication/call/components/call-overlay.tsx
 "use client";
 
-import React, { useContext, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
+import "@livekit/components-styles";
 import { Dialog,
   DialogContent,
   DialogDescription,
@@ -17,6 +18,7 @@ import {
 } from "../types/call.types";
 import {
   Maximize2,
+  Minimize2,
   Phone,
   Video,
   VideoOff,
@@ -28,13 +30,16 @@ import {
   Volume2,
   Mic,
   MicOff,
+  ArrowLeft,
+  MoreVertical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Room, RoomEvent, Track } from "livekit-client";
 import {
-  RoomContext,
-  type TrackReference,
+  LiveKitRoom,
   useTracks,
+  VideoTrack,
+  useRoomContext,
 } from "@livekit/components-react";
 
 interface CallOverlayProps {
@@ -46,6 +51,7 @@ interface CallOverlayProps {
   room?: Room | null;
   isMicEnabled?: boolean;
   isCameraEnabled?: boolean;
+  isSpeakerEnabled?: boolean;
   mediaErrorMessage?: string | null;
   isAudioPlaybackBlocked?: boolean;
   isLocalSpeaking?: boolean;
@@ -53,6 +59,8 @@ interface CallOverlayProps {
   onStartAudio?: () => void;
   onToggleMic?: () => void;
   onToggleCamera?: () => void;
+  onToggleSpeaker?: () => void;
+  onSwitchCamera?: () => void;
   onEndCall: (callId?: string) => void;
 }
 
@@ -82,7 +90,7 @@ function VideoStageContent({
 }) {
   const [isLocalMain, setIsLocalMain] = useState(false);
   const [, refreshTracks] = useState(0);
-  const room = useContext(RoomContext);
+  const room = useRoomContext();
 
   useEffect(() => {
     if (!room) return;
@@ -108,144 +116,138 @@ function VideoStageContent({
   const isRemoteVideoActive = Boolean(
     remoteTrack &&
     remoteTrack.publication &&
-    !remoteTrack.publication.isMuted &&
-    remoteTrack.publication.track
+    !remoteTrack.publication.isMuted
   );
 
   const isLocalVideoActive = Boolean(
     isCameraEnabled &&
     localTrack &&
     localTrack.publication &&
-    !localTrack.publication.isMuted &&
-    localTrack.publication.track
+    !localTrack.publication.isMuted
   );
 
-  const mainTrack = isLocalMain ? localTrack : remoteTrack;
-  const pipTrack = isLocalMain ? remoteTrack : localTrack;
-  const isMainVideoActive = isLocalMain ? isLocalVideoActive : isRemoteVideoActive;
-  const isPipVideoActive = isLocalMain ? isRemoteVideoActive : isLocalVideoActive;
-  const mainName = isLocalMain ? "You" : participantName;
   const canSwapVideos = isLocalVideoActive && isRemoteVideoActive;
 
-  const renderVideo = (trackRef: TrackReference, mirrored: boolean, className: string) => (
-    <AttachedVideo
-      trackRef={trackRef}
-      mirrored={mirrored}
-      className={className}
-    />
-  );
+  const getContainerClasses = (isMain: boolean) =>
+    isMain
+      ? "absolute inset-0 w-full h-full z-0 transition-all duration-500 ease-in-out bg-[#0c1317]"
+      : cn(
+          "absolute right-4 bottom-32 sm:bottom-36 w-28 sm:w-48 aspect-[3/4] sm:aspect-video rounded-2xl overflow-hidden shadow-2xl border-2 border-white/10 z-20 bg-slate-900/90 backdrop-blur-md flex items-center justify-center transition-all duration-500 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9ef01a]",
+          canSwapVideos ? "cursor-pointer hover:border-[#9ef01a] hover:scale-105 hover:shadow-[#9ef01a]/20" : "cursor-default opacity-90",
+          (!isLocalMain ? !isLocalVideoActive : !isRemoteVideoActive) && "border-dashed"
+        );
+
+  const handlePipClick = (isMain: boolean) => {
+    if (!isMain && canSwapVideos) {
+      setIsLocalMain((current) => !current);
+    }
+  };
 
   return (
-    <div className="w-full h-full relative flex items-center justify-center bg-slate-950 overflow-hidden rounded-2xl border border-white/10 shadow-inner">
-      {/* Main video stage */}
-      {isMainVideoActive && mainTrack ? (
-        renderVideo(mainTrack, isLocalMain, "w-full h-full object-cover")
-      ) : (
-        <div className="flex flex-col items-center justify-center p-6 text-center z-10">
-          <div className="relative mb-4">
-            <CallAvatar
-              name={participantName}
-              avatarUrl={participantAvatar}
-              size="lg"
-              isPulsing={callState === "ACCEPTED"}
-            />
-          </div>
-          <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-            {mainName}
-          </h3>
-
-          <div className="mt-2">
-            <CallStatus
-              state={callState}
-              callType="VIDEO"
-              statusMessage={statusMessage}
-              liveKitState={liveKitState}
-            />
-          </div>
-
-          <div className="mt-4 px-3.5 py-1.5 rounded-full bg-slate-900/80 backdrop-blur-md border border-white/10 text-xs text-slate-300 flex items-center gap-2">
-            <VideoOff className="w-3.5 h-3.5 text-slate-400" />
-            <span>
-              {isLocalMain
-                ? "Your camera is turned off"
-                : remoteTrack
-                  ? "Remote camera is turned off"
-                : "Waiting for participant's video..."}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Floating secondary video preview; clicking it swaps the main stage */}
-      <button
-        type="button"
-        onClick={() => canSwapVideos && setIsLocalMain((current) => !current)}
-        disabled={!canSwapVideos}
-        className={cn(
-          "absolute top-4 right-4 w-32 h-44 sm:w-40 sm:h-52 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20 z-20 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9ef01a]",
-          canSwapVideos ? "cursor-pointer hover:border-[#9ef01a]" : "cursor-default"
-        )}
-        aria-label={`Show ${isLocalMain ? participantName : "your"} video larger`}
-        title={canSwapVideos ? "Swap video size" : undefined}
+    <div className="w-full h-full relative flex items-center justify-center bg-[#0c1317] overflow-hidden">
+      
+      {/* Remote Video Container */}
+      <div 
+        className={getContainerClasses(!isLocalMain)}
+        onClick={() => handlePipClick(!isLocalMain)}
       >
-        {isPipVideoActive && pipTrack ? (
-          renderVideo(
-            pipTrack,
-            !isLocalMain,
-            "w-full h-full object-cover"
-          )
-        ) : (
-          <div className="flex flex-col items-center justify-center p-3 text-center">
-            <CallAvatar name={isLocalMain ? participantName : "You"} size="sm" />
-            <div className="mt-2 flex items-center gap-1 text-[11px] text-slate-400">
-              <VideoOff className="w-3.5 h-3.5 text-rose-400" />
-              <span>{isLocalMain ? "Remote camera off" : "Camera off"}</span>
-            </div>
+        {remoteTrack && (
+          <VideoTrack 
+            trackRef={remoteTrack} 
+            className={cn("absolute inset-0 w-full h-full object-cover transition-opacity duration-300", !isRemoteVideoActive && "opacity-0")} 
+          />
+        )}
+        
+        {!isRemoteVideoActive && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-[#0c1317]">
+            {!isLocalMain ? (
+              // Remote PiP Fallback
+              <div className="flex flex-col items-center justify-center p-3 text-center">
+                <CallAvatar name={participantName} size="sm" />
+                <div className="mt-2 flex items-center gap-1 text-[11px] text-slate-400">
+                  <VideoOff className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Remote off</span>
+                </div>
+              </div>
+            ) : (
+              // Remote Main Fallback
+              <>
+                <div className="relative mb-4">
+                  <CallAvatar
+                    name={participantName}
+                    avatarUrl={participantAvatar}
+                    size="lg"
+                    isPulsing={callState === "ACCEPTED"}
+                  />
+                </div>
+                <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                  {participantName}
+                </h3>
+                <div className="mt-2">
+                  <CallStatus
+                    state={callState}
+                    callType="VIDEO"
+                    statusMessage={statusMessage}
+                    liveKitState={liveKitState}
+                  />
+                </div>
+                <div className="mt-4 px-3.5 py-1.5 rounded-full bg-slate-900/80 backdrop-blur-md border border-white/10 text-xs text-slate-300 flex items-center gap-2">
+                  <VideoOff className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Waiting for participant&apos;s video...</span>
+                </div>
+              </>
+            )}
           </div>
         )}
-      </button>
+      </div>
+
+      {/* Local Video Container */}
+      <div 
+        className={getContainerClasses(isLocalMain)}
+        onClick={() => handlePipClick(isLocalMain)}
+      >
+        {localTrack && (
+          <VideoTrack 
+            trackRef={localTrack} 
+            className={cn("absolute inset-0 w-full h-full object-cover -scale-x-100 transition-opacity duration-300", !isLocalVideoActive && "opacity-0")} 
+          />
+        )}
+
+        {!isLocalVideoActive && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-[#0c1317]">
+            {isLocalMain ? (
+              // Local Main Fallback
+              <>
+                <div className="relative mb-4">
+                  <CallAvatar name="You" size="lg" />
+                </div>
+                <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                  You
+                </h3>
+                <div className="mt-4 px-3.5 py-1.5 rounded-full bg-slate-900/80 backdrop-blur-md border border-white/10 text-xs text-slate-300 flex items-center gap-2">
+                  <VideoOff className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Your camera is turned off</span>
+                </div>
+              </>
+            ) : (
+              // Local PiP Fallback
+              <div className="flex flex-col items-center justify-center p-3 text-center">
+                <CallAvatar name="You" size="sm" />
+                <div className="mt-2 flex items-center gap-1 text-[11px] text-slate-400">
+                  <VideoOff className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Camera off</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }
 
-function AttachedVideo({
-  trackRef,
-  mirrored,
-  className,
-}: {
-  trackRef: TrackReference;
-  mirrored: boolean;
-  className: string;
-}) {
-  const videoRef = React.useRef<HTMLVideoElement>(null);
-  const track = trackRef.publication.track;
 
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !track) return;
-
-    track.attach(video);
-    video.autoplay = true;
-    video.muted = trackRef.participant.isLocal;
-    video.playsInline = true;
-    void video.play().catch(() => undefined);
-
-    return () => {
-      track.detach(video);
-    };
-  }, [track, trackRef.participant.isLocal]);
-
-  return (
-    <video
-      ref={videoRef}
-      autoPlay
-      muted={trackRef.participant.isLocal}
-      playsInline
-      className={cn(className, mirrored && "-scale-x-100")}
-      aria-label={trackRef.participant.isLocal ? "Your video" : "Participant video"}
-    />
-  );
-}
 
 /**
  * AudioStageContent Component
@@ -376,13 +378,16 @@ export function CallOverlay({
   room,
   isMicEnabled = true,
   isCameraEnabled = true,
+  isSpeakerEnabled = false,
   mediaErrorMessage,
   isAudioPlaybackBlocked,
   isLocalSpeaking,
-  isRemoteSpeaking,
+  isRemoteSpeaking = false,
   onStartAudio,
   onToggleMic,
   onToggleCamera,
+  onToggleSpeaker,
+  onSwitchCamera,
   onEndCall,
 }: CallOverlayProps) {
   const [isMinimized, setIsMinimized] = useState(false);
@@ -400,74 +405,73 @@ export function CallOverlay({
     onEndCall(activeCall.callId || undefined);
   };
 
-  // Minimized floating PIP mode on bottom right (allowing uninterrupted chat while seeing call status)
-  if (isMinimized) {
-    return (
-      <>
+  // Minimized floating PIP mode on bottom right
+  const minimizedWidget = isMinimized ? (
+    <div className="fixed bottom-5 right-5 z-50 bg-[#111b21]/95 backdrop-blur-md text-white border border-[#222e35] p-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-5 duration-200 select-none">
+      <div className="relative">
+        <CallAvatar
+          name={participantName}
+          avatarUrl={participantAvatar}
+          size="sm"
+          isPulsing={callState === "ACCEPTED"}
+        />
+        <span className="absolute -bottom-1 -right-1 p-0.5 rounded-full bg-[#111b21] text-[#9ef01a]">
+          {isVideo ? (
+            <Video className="w-2.5 h-2.5 stroke-2" />
+          ) : (
+            <Phone className="w-2.5 h-2.5 stroke-2" />
+          )}
+        </span>
+      </div>
 
-        <div className="fixed bottom-5 right-5 z-50 bg-[#111b21]/95 backdrop-blur-md text-white border border-[#222e35] p-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-5 duration-200 select-none">
-          <div className="relative">
-            <CallAvatar
-              name={participantName}
-              avatarUrl={participantAvatar}
-              size="sm"
-              isPulsing={callState === "ACCEPTED"}
-            />
-            <span className="absolute -bottom-1 -right-1 p-0.5 rounded-full bg-[#111b21] text-[#9ef01a]">
-              {isVideo ? (
-                <Video className="w-2.5 h-2.5 stroke-2" />
-              ) : (
-                <Phone className="w-2.5 h-2.5 stroke-2" />
-              )}
-            </span>
-          </div>
+      <div className="flex flex-col min-w-0 pr-2">
+        <span className="text-xs font-semibold text-white truncate max-w-30">
+          {participantName}
+        </span>
+        <CallStatus
+          state={callState}
+          callType={activeCall.callType}
+          startedAt={activeCall.startedAt}
+          statusMessage={statusMessage}
+          liveKitState={liveKitState}
+          className="text-[11px] items-start"
+        />
+      </div>
 
-          <div className="flex flex-col min-w-0 pr-2">
-            <span className="text-xs font-semibold text-white truncate max-w-30">
-              {participantName}
-            </span>
-            <CallStatus
-              state={callState}
-              callType={activeCall.callType}
-              startedAt={activeCall.startedAt}
-              statusMessage={statusMessage}
-              liveKitState={liveKitState}
-              className="text-[11px] items-start"
-            />
-          </div>
-
-          <div className="flex items-center gap-1 pl-1 border-l border-white/10">
-            <button
-              type="button"
-              onClick={() => setIsMinimized(false)}
-              className="p-1.5 rounded-full hover:bg-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9ef01a]"
-              aria-label="Expand call"
-              title="Expand call"
-            >
-              <Maximize2 className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={handleEnd}
-              className="p-1.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
-              aria-label="End call"
-              title="End call"
-            >
-              <Phone className="w-3.5 h-3.5 rotate-135" />
-            </button>
-          </div>
-        </div>
-      </>
-    );
-  }
+      <div className="flex items-center gap-1 pl-1 border-l border-white/10">
+        <button
+          type="button"
+          onClick={() => setIsMinimized(false)}
+          className="p-1.5 rounded-full hover:bg-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9ef01a]"
+          aria-label="Expand call"
+          title="Expand call"
+        >
+          <Maximize2 className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          onClick={handleEnd}
+          className="p-1.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
+          aria-label="End call"
+          title="End call"
+        >
+          <Phone className="w-3.5 h-3.5 rotate-135" />
+        </button>
+      </div>
+    </div>
+  ) : null;
 
   return (
-    <Dialog open={open} onOpenChange={() => {}}>
+    <>
+      {minimizedWidget}
+      <Dialog open={open && !isMinimized} onOpenChange={() => {}}>
       <DialogContent
         showCloseButton={false}
         className={cn(
-          "w-[96vw] max-w-lg sm:max-w-2xl bg-[#0c1317] text-white border-[#222e35] p-0 rounded-3xl shadow-2xl overflow-hidden flex flex-col justify-between select-none animate-in fade-in zoom-in-95 duration-200",
-          isVideo ? "h-[80vh] sm:h-[82vh] max-h-180" : "h-110 sm:h-120"
+          "bg-[#0c1317] text-white p-0 shadow-2xl overflow-hidden flex flex-col justify-between select-none animate-in fade-in zoom-in-95 duration-200",
+          isVideo 
+            ? "w-screen h-dvh max-w-none rounded-none border-none" 
+            : "w-[96vw] max-w-lg sm:max-w-2xl rounded-3xl border-[#222e35] h-110 sm:h-120"
         )}
       >
         <DialogTitle className="sr-only">
@@ -478,25 +482,67 @@ export function CallOverlay({
         </DialogDescription>
 
         {/* Top Header Bar */}
-        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-white/10 bg-slate-900/40 z-10">
-          <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-xl bg-white/10 text-[#9ef01a]">
-              {isVideo ? (
-                <Video className="w-4 h-4" />
-              ) : (
+        <div className={cn(
+          "flex items-center justify-between p-4 sm:p-5 z-20 transition-all",
+          isVideo 
+            ? "absolute top-0 inset-x-0 bg-linear-to-b from-black/60 to-transparent pointer-events-none" 
+            : "border-b border-white/10 bg-slate-900/40"
+        )}>
+          <div className={cn("flex items-center gap-3", isVideo && "pointer-events-auto")}>
+            {isVideo && (
+              <button onClick={() => setIsMinimized(true)} className="p-2 text-white hover:bg-white/10 rounded-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9ef01a]">
+                <ArrowLeft className="w-6 h-6" />
+              </button>
+            )}
+            
+            {!isVideo && (
+              <span className="p-1.5 rounded-xl bg-white/10 text-[#9ef01a]">
                 <Phone className="w-4 h-4" />
-              )}
-            </span>
-            <div className="flex flex-col">
-              <span className="text-xs font-semibold text-white tracking-wide">
-                {isVideo ? "HD VIDEO CALL" : "ENCRYPTED AUDIO CALL"}
               </span>
-              <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-[#9ef01a]" /> End-to-end encrypted
-              </span>
-            </div>
+            )}
+            
+            {isVideo ? (
+              <div className="flex items-center gap-3">
+                <CallAvatar name={participantName} avatarUrl={participantAvatar} size="sm" />
+                <div className="flex flex-col">
+                  <span className="text-base font-semibold text-white tracking-wide">
+                    {participantName}
+                  </span>
+                  <span className="text-xs text-slate-300 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-[#9ef01a]"></span>
+                    {callState === "ACCEPTED" ? "Connected" : "Calling"}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col">
+                <span className="text-xs font-semibold text-white tracking-wide">
+                  ENCRYPTED AUDIO CALL
+                </span>
+                <span className="text-[11px] text-slate-400 flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3 text-[#9ef01a]" /> End-to-end encrypted
+                </span>
+              </div>
+            )}
           </div>
 
+          <div className={cn("flex items-center gap-2", isVideo && "pointer-events-auto")}>
+            {isVideo ? (
+               <button className="p-2 rounded-full bg-slate-900/40 hover:bg-white/20 text-white transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9ef01a]">
+                 <MoreVertical className="w-5 h-5" />
+               </button>
+            ) : (
+               <button
+                 type="button"
+                 onClick={() => setIsMinimized(true)}
+                 className="p-2 rounded-full hover:bg-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9ef01a]"
+                 aria-label="Minimize call"
+                 title="Minimize call"
+               >
+                 <Minimize2 className="w-5 h-5" />
+               </button>
+            )}
+          </div>
         </div>
 
         {/* Browser Autoplay Blocked Banner */}
@@ -531,9 +577,12 @@ export function CallOverlay({
         )}
 
         {/* Center Stage: Bound to LiveKit Room */}
-        <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 text-center relative overflow-hidden">
+        <div className={cn(
+          "flex flex-col items-center justify-center text-center relative overflow-hidden",
+          isVideo ? "absolute inset-0 z-0" : "flex-1 p-4 sm:p-6"
+        )}>
           {room ? (
-            <RoomContext.Provider value={room}>
+            <LiveKitRoom room={room} serverUrl="" token="" connect={false} className="w-full h-full">
               {isVideo ? (
                 <VideoStageContent
                   participantName={participantName}
@@ -555,7 +604,7 @@ export function CallOverlay({
                   isMicEnabled={isMicEnabled}
                 />
               )}
-            </RoomContext.Provider>
+            </LiveKitRoom>
           ) : (
             /* Pre-connection fallback */
             <div className="flex flex-col items-center justify-center p-6">
@@ -582,19 +631,27 @@ export function CallOverlay({
         </div>
 
         {/* Bottom Control Bar */}
-        <div className="p-4 sm:p-6 flex items-center justify-center border-t border-white/10 bg-slate-900/40 z-10">
+        <div className={cn(
+          "flex items-center justify-center z-20 pointer-events-auto transition-all",
+          isVideo 
+            ? "absolute bottom-8 sm:bottom-10 inset-x-0" 
+            : "p-4 sm:p-6 border-t border-white/10 bg-slate-900/40"
+        )}>
           <CallControls
             mode="in-call"
             callType={activeCall.callType}
             isMicEnabled={isMicEnabled}
             isCameraEnabled={isCameraEnabled}
+            isSpeakerEnabled={isSpeakerEnabled}
             onToggleMic={onToggleMic}
             onToggleCamera={onToggleCamera}
+            onToggleSpeaker={onToggleSpeaker}
+            onSwitchCamera={onSwitchCamera}
             onEnd={handleEnd}
           />
         </div>
       </DialogContent>
     </Dialog>
+    </>
   );
 }
-

@@ -8,6 +8,7 @@ import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import {
   initiateOutgoingCall,
   setOutgoingRinging,
+  setOutgoingCallId,
   setIncomingCall,
   setCallAccepted,
   setCallRejected,
@@ -29,11 +30,15 @@ import {
   CallErrorPayload,
 } from "../types/call.types";
 import { toast } from "sonner";
+import { callService } from "../services/call.service";
 
 export function useCallSignaling() {
   const dispatch = useAppDispatch();
   const activeCall = useAppSelector((state) => state.call.activeCall);
   const callState = useAppSelector((state) => state.call.callState);
+  const connectionStatus = useAppSelector(
+    (state) => state.communication.connectionStatus
+  );
 
   // Keep a ref to activeCall to avoid re-subscribing socket listeners on every state change
   const activeCallRef = useRef(activeCall);
@@ -190,7 +195,32 @@ export function useCallSignaling() {
       socket.off(REALTIME_EVENTS.SERVER.CALL_ERROR, handleCallError);
       clearAutoResetTimer();
     };
-  }, [dispatch, clearAutoResetTimer, scheduleReset]);
+  }, [dispatch, clearAutoResetTimer, scheduleReset, connectionStatus]);
+
+  // Move an offline call to Ringing when the receiver comes online.
+  useEffect(() => {
+    const currentCall = activeCall;
+    const receiverId = currentCall?.receiver?.id;
+    if (callState !== "RINGING_OUTGOING" || !currentCall?.callId || !receiverId) {
+      return;
+    }
+
+    const checkReceiverPresence = async () => {
+      if (callStateRef.current !== "RINGING_OUTGOING") return;
+      const online = await callService.isUserOnline(receiverId);
+      if (online && callStateRef.current === "RINGING_OUTGOING") {
+        dispatch(
+          setOutgoingRinging({
+            callId: currentCall.callId!,
+            conversationId: currentCall.conversationId || undefined,
+          })
+        );
+      }
+    };
+
+    const interval = window.setInterval(checkReceiverPresence, 2000);
+    return () => window.clearInterval(interval);
+  }, [activeCall, callState, dispatch]);
 
   // ============================================================================
   // Outgoing Call Control Methods
@@ -210,11 +240,6 @@ export function useCallSignaling() {
         return;
       }
 
-      if (!socketClient.isConnected()) {
-        toast.error("Cannot start call — real-time connection offline.", { duration: 3000 });
-        return;
-      }
-
       clearAutoResetTimer();
       
       // Optimistically enter outgoing ringing state with callee details
@@ -227,6 +252,24 @@ export function useCallSignaling() {
       );
 
       try {
+        const socketReady = await socketClient.waitForConnection();
+        if (!socketReady) {
+          const fallback = await callService.startCall({ conversationId, callType });
+          if (fallback.isBusy) {
+            dispatch(setCallBusy({ callId: fallback.callId, reason: "User is currently on another call." }));
+            scheduleReset(3000);
+            return;
+          }
+          if (fallback.callId) {
+            dispatch(
+              fallback.receiverOnline
+                ? setOutgoingRinging({ callId: fallback.callId, conversationId })
+                : setOutgoingCallId({ callId: fallback.callId, conversationId })
+            );
+          }
+          return;
+        }
+
         interface StartCallAck {
           success: boolean;
           data?: {
@@ -234,6 +277,7 @@ export function useCallSignaling() {
             conversationId: string;
             status: string;
             busyUserId?: string;
+            receiverOnline?: boolean;
           };
           error?: {
             code: string;
@@ -261,10 +305,15 @@ export function useCallSignaling() {
           }
 
           dispatch(
-            setOutgoingRinging({
-              callId: res.data.callId,
-              conversationId: res.data.conversationId,
-            })
+            res.data.receiverOnline
+              ? setOutgoingRinging({
+                  callId: res.data.callId,
+                  conversationId: res.data.conversationId,
+                })
+              : setOutgoingCallId({
+                  callId: res.data.callId,
+                  conversationId: res.data.conversationId,
+                })
           );
         } else if (res && !res.success && res.error) {
           dispatch(setCallError({ message: res.error.message }));

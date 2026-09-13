@@ -27,6 +27,7 @@ export interface CallMediaState {
   isAudioPlaybackBlocked?: boolean;
   isLocalSpeaking?: boolean;
   isRemoteSpeaking?: boolean;
+  isSpeakerEnabled?: boolean;
 }
 
 export interface CallParticipantInfo {

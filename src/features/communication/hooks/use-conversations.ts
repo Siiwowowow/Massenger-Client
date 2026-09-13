@@ -36,6 +36,7 @@ export function useConversations(currentUserId?: string, searchQuery?: string) {
         limit: 50,
       }),
     staleTime: 30000,
+    refetchInterval: 8000,
   });
 
   // 2. Fetch unread counts map
@@ -43,6 +44,7 @@ export function useConversations(currentUserId?: string, searchQuery?: string) {
     queryKey: ["conversations", "unread-counts"],
     queryFn: () => communicationService.getUnreadCounts(),
     staleTime: 30000,
+    refetchInterval: 8000,
   });
 
   // Optimistically clear unread count when conversation becomes active

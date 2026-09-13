@@ -56,9 +56,11 @@ export function useCommunicationSocket() {
     }
 
     syncUser();
+    const heartbeat = window.setInterval(syncUser, 20_000);
 
     return () => {
       isMounted = false;
+      window.clearInterval(heartbeat);
     };
   }, [userId, userName, userEmail, userAvatar]);
 

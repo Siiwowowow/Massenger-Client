@@ -25,8 +25,10 @@ export interface UseLiveKitCallReturn {
   mediaState: CallMediaState;
   isMicEnabled: boolean;
   isCameraEnabled: boolean;
+  isSpeakerEnabled: boolean;
   toggleMic: () => Promise<boolean>;
   toggleCamera: () => Promise<boolean>;
+  toggleSpeaker: () => Promise<boolean>;
   switchCamera: () => Promise<boolean>;
   disconnect: () => void;
   startAudio: () => Promise<boolean>;
@@ -51,6 +53,7 @@ export function useLiveKitCall({
   const [liveKitState, setLiveKitState] = useState<LiveKitConnectionState>(
     () => liveKitCallManager.getConnectionState()
   );
+  const [room, setRoom] = useState<Room | null>(() => liveKitCallManager.getRoom());
   const [error, setError] = useState<string | null>(null);
   const [mediaState, setMediaState] = useState<CallMediaState>(
     () => liveKitCallManager.getMediaState()
@@ -68,6 +71,7 @@ export function useLiveKitCall({
   useEffect(() => {
     const unsubState = liveKitCallManager.onConnectionStateChange((state) => {
       setLiveKitState(state);
+      setRoom(liveKitCallManager.getRoom());
       if (state === "DISCONNECTED") {
         onDisconnectedRef.current?.();
       }
@@ -98,24 +102,25 @@ export function useLiveKitCall({
     const callType = activeCall?.callType;
 
     if (callState === "ACCEPTED" && callId && conversationId && callType) {
-      liveKitCallManager.connect({
-        callId,
-        conversationId,
-        callState,
-        callType,
-      });
+      liveKitCallManager
+        .connect({
+          callId,
+          conversationId,
+          callState,
+          callType,
+        })
+        .catch((err) => {
+          console.error("[useLiveKitCall] Connection failed:", err);
+        });
     } else {
       // Clean disconnect whenever call is no longer ACCEPTED
       liveKitCallManager.disconnect();
     }
   }, [callState, activeCall?.callId, activeCall?.conversationId, activeCall?.callType]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      liveKitCallManager.disconnect();
-    };
-  }, []);
+  // Disconnect is handled by the callState effect above when the call ends.
+  // We do not add a strict unmount cleanup here to prevent React 18 StrictMode double-invocation
+  // from aborting the connection prematurely.
 
   const toggleMic = useCallback(async () => {
     return liveKitCallManager.toggleMicrophone();
@@ -129,6 +134,10 @@ export function useLiveKitCall({
     return liveKitCallManager.switchCamera();
   }, []);
 
+  const toggleSpeaker = useCallback(async () => {
+    return liveKitCallManager.toggleSpeaker();
+  }, []);
+
   const disconnect = useCallback(() => {
     liveKitCallManager.disconnect();
   }, []);
@@ -139,13 +148,15 @@ export function useLiveKitCall({
 
   return {
     liveKitState,
-    room: liveKitCallManager.getRoom(),
+    room,
     error,
     mediaState,
     isMicEnabled: mediaState.isMicEnabled,
     isCameraEnabled: mediaState.isCameraEnabled,
+    isSpeakerEnabled: mediaState.isSpeakerEnabled ?? false,
     toggleMic,
     toggleCamera,
+    toggleSpeaker,
     switchCamera,
     disconnect,
     startAudio,

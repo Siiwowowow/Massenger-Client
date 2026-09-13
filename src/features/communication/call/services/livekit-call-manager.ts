@@ -29,6 +29,60 @@ export type StateChangeCallback = (state: LiveKitConnectionState) => void;
 export type ErrorCallback = (error: Error | null) => void;
 export type MediaChangeCallback = (media: CallMediaState) => void;
 
+export class LiveKitConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "LiveKitConfigError";
+  }
+}
+
+/**
+ * Resolves the LiveKit SFU server URL with environment safety:
+ * - Production:
+ *   - Requires serverUrl (from backend) or NEXT_PUBLIC_LIVEKIT_URL.
+ *   - Throws a clear configuration error if both are missing.
+ *   - Localhost and insecure ws:// URLs are strictly disallowed.
+ * - Development:
+ *   - Allows localhost.
+ *   - Falls back to ws://localhost:7880 if neither serverUrl nor NEXT_PUBLIC_LIVEKIT_URL is provided.
+ */
+export function resolveLiveKitServerUrl(
+  backendServerUrl?: string | null,
+  clientEnvUrl?: string | null,
+  envMode: string = process.env.NODE_ENV || "development"
+): string {
+  const isProduction = envMode === "production";
+  const trimmedBackend = backendServerUrl?.trim() || "";
+  const trimmedEnv = clientEnvUrl?.trim() || "";
+
+  const candidateUrl = trimmedBackend || trimmedEnv;
+
+  if (!candidateUrl) {
+    if (isProduction) {
+      throw new LiveKitConfigError(
+        "LiveKit configuration error: LiveKit server URL is missing. Both backend serverUrl and NEXT_PUBLIC_LIVEKIT_URL are undefined in production."
+      );
+    }
+    // Development fallback: localhost allowed only in development
+    return "ws://localhost:7880";
+  }
+
+  if (isProduction) {
+    const isLocalhost =
+      candidateUrl.includes("localhost") ||
+      candidateUrl.includes("127.0.0.1") ||
+      candidateUrl.startsWith("ws://");
+
+    if (isLocalhost) {
+      throw new LiveKitConfigError(
+        `LiveKit configuration error: Localhost or insecure URL "${candidateUrl}" is not allowed in production. Localhost is permitted only in development.`
+      );
+    }
+  }
+
+  return candidateUrl;
+}
+
 /**
  * LiveKitCallManager
  *
@@ -60,6 +114,7 @@ export class LiveKitCallManager {
     isAudioPlaybackBlocked: false,
     isLocalSpeaking: false,
     isRemoteSpeaking: false,
+    isSpeakerEnabled: false,
   };
 
   private stateChangeListeners = new Set<StateChangeCallback>();
@@ -175,6 +230,20 @@ export class LiveKitCallManager {
   }
 
   /**
+   * Resolves the LiveKit server URL for the given environment.
+   */
+  public resolveServerUrl(
+    serverUrl?: string | null,
+    envMode: string = process.env.NODE_ENV || "development"
+  ): string {
+    return resolveLiveKitServerUrl(
+      serverUrl,
+      env.client.NEXT_PUBLIC_LIVEKIT_URL,
+      envMode
+    );
+  }
+
+  /**
    * Connect to LiveKit Room for the specified active call
    */
   public async connect({
@@ -216,6 +285,7 @@ export class LiveKitCallManager {
     this.notifyError(null);
     this.setConnectionState("CONNECTING");
 
+    let targetUrl = "";
     try {
       // 3. Token Security: Request token from backend (token is in-memory only)
       const tokenResult = await callService.requestCallToken({
@@ -237,11 +307,8 @@ export class LiveKitCallManager {
         throw new Error("No LiveKit call token returned by backend.");
       }
 
-      // Determine server URL: backend serverUrl > NEXT_PUBLIC_LIVEKIT_URL > fallback
-      const targetUrl =
-        serverUrl ||
-        env.client.NEXT_PUBLIC_LIVEKIT_URL ||
-        "ws://localhost:7880";
+      // Determine server URL: backend serverUrl > NEXT_PUBLIC_LIVEKIT_URL > dev fallback
+      targetUrl = this.resolveServerUrl(serverUrl);
 
       // 5. Instantiate LiveKit Room with official adaptive stream and dynacast
       const room = new Room({
@@ -249,27 +316,39 @@ export class LiveKitCallManager {
         dynacast: true,
       });
 
+      // 5.5 Pre-acquire media to avoid gesture timeouts on iOS/mobile browsers
+      try {
+        if (callType === "VIDEO") {
+          await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        } else {
+          await navigator.mediaDevices.getUserMedia({ audio: true });
+        }
+      } catch (e) {
+        console.warn("[LiveKitCallManager] Pre-acquire media failed:", e);
+      }
+
       this.room = room;
+      
+      // Trigger a state update so the React UI can grab the new room instance immediately
+      this.setConnectionState("CONNECTING");
 
       // 6. Register Room Event Listeners
       room.on(RoomEvent.Connected, () => {
-        if (this.activeCallId === currentAttemptCallId) {
-          this.connectedCallId = currentAttemptCallId;
-          this.isConnecting = false;
-          this.setConnectionState("CONNECTED");
+        if (this.activeCallId !== currentAttemptCallId) {
+          room.disconnect();
+          return;
         }
+        this.connectedCallId = currentAttemptCallId;
+        this.isConnecting = false;
+        this.setConnectionState("CONNECTED");
       });
 
       room.on(RoomEvent.Reconnecting, () => {
-        if (this.activeCallId === currentAttemptCallId) {
-          this.setConnectionState("RECONNECTING");
-        }
+        this.setConnectionState("RECONNECTING");
       });
 
       room.on(RoomEvent.Reconnected, () => {
-        if (this.activeCallId === currentAttemptCallId) {
-          this.setConnectionState("CONNECTED");
-        }
+        this.setConnectionState("CONNECTED");
       });
 
       room.on(RoomEvent.Disconnected, () => {
@@ -369,6 +448,15 @@ export class LiveKitCallManager {
         }
       );
 
+      // Instantly drop the call if the remote participant leaves (for 1:1 calls)
+      room.on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
+        console.log(`[LiveKitCallManager] Remote participant disconnected: ${participant.identity}`);
+        if (this.room && this.room.remoteParticipants.size === 0) {
+          console.log(`[LiveKitCallManager] No remote participants left. Disconnecting instantly.`);
+          this.disconnect();
+        }
+      });
+
       // Autoplay unlock tracking
       room.on(RoomEvent.AudioPlaybackStatusChanged, () => {
         const canPlay = room.canPlaybackAudio;
@@ -406,20 +494,21 @@ export class LiveKitCallManager {
         // Mobile browsers require a user gesture before remote audio can play.
         this.setMediaState({ isAudioPlaybackBlocked: true });
       }
-
       // 9. Publish Real Media Tracks based on CallType
       if (callType === "AUDIO") {
         // AUDIO CALL: Publish microphone only. Camera is NEVER requested or published.
         try {
-          await room.localParticipant.setMicrophoneEnabled(true);
-          console.log('[LiveKitCallManager DIAGNOSTICS] localParticipant.audioTrackPublications.size:', room.localParticipant.audioTrackPublications.size);
+          // Optimistic UI updates
           this.setMediaState({
             isMicEnabled: true,
             isCameraEnabled: false,
+            isSpeakerEnabled: false,
             hasMicError: false,
             hasCameraError: false,
             mediaErrorMessage: null,
           });
+          await room.localParticipant.setMicrophoneEnabled(true);
+          console.log('[LiveKitCallManager DIAGNOSTICS] localParticipant.audioTrackPublications.size:', room.localParticipant.audioTrackPublications.size);
         } catch (micErr: unknown) {
           console.error("[LiveKitCallManager] Audio call microphone permission error:", micErr);
           const errorMsg = "Microphone access was denied. Please check your browser permissions.";
@@ -437,24 +526,37 @@ export class LiveKitCallManager {
         let camSuccess = false;
         let errorNotice: string | null = null;
 
-        // Try microphone first
-        try {
-          await room.localParticipant.setMicrophoneEnabled(true);
+        // Optimistic UI updates
+        this.setMediaState({
+          isMicEnabled: true,
+          isCameraEnabled: true,
+          isSpeakerEnabled: true,
+        });
+
+        // Try microphone and camera concurrently
+        const results = await Promise.allSettled([
+          room.localParticipant.setMicrophoneEnabled(true),
+          room.localParticipant.setCameraEnabled(true)
+        ]);
+
+        if (results[0].status === "fulfilled") {
           micSuccess = true;
-        } catch (micErr: unknown) {
-          console.warn("[LiveKitCallManager] Video call mic error:", micErr);
-          errorNotice = "Microphone access denied.";
+        } else {
+          console.warn("[LiveKitCallManager] Video call mic error:", results[0].reason);
         }
 
-        // Try camera second
-        try {
-          await room.localParticipant.setCameraEnabled(true);
+        if (results[1].status === "fulfilled") {
           camSuccess = true;
-        } catch (camErr: unknown) {
-          console.warn("[LiveKitCallManager] Video call camera error:", camErr);
-          errorNotice = errorNotice
-            ? "Camera and microphone access denied."
-            : "Camera access denied. Continuing as audio-only.";
+        } else {
+          console.warn("[LiveKitCallManager] Video call camera error:", results[1].reason);
+        }
+
+        if (!micSuccess && !camSuccess) {
+           errorNotice = "Camera and microphone permissions were denied or unavailable.";
+        } else if (!micSuccess) {
+           errorNotice = "Microphone access denied.";
+        } else if (!camSuccess) {
+           errorNotice = "Camera access denied. Continuing as audio-only.";
         }
 
         // If both failed, media cannot proceed
@@ -464,9 +566,9 @@ export class LiveKitCallManager {
             isCameraEnabled: false,
             hasMicError: true,
             hasCameraError: true,
-            mediaErrorMessage: "Camera and microphone permissions were denied or unavailable.",
+            mediaErrorMessage: errorNotice,
           });
-          throw new Error("Camera and microphone permissions were denied or unavailable.");
+          throw new Error(errorNotice ?? "Camera and microphone permissions were denied.");
         }
 
         this.setMediaState({
@@ -488,18 +590,28 @@ export class LiveKitCallManager {
 
       let connMsg = "Failed to connect to LiveKit call room.";
       if (err instanceof Error) {
-        const msg = err.message.toLowerCase();
         if (
-          msg.includes("connect") ||
-          msg.includes("websocket") ||
-          msg.includes("failed to fetch") ||
-          msg.includes("refused") ||
-          msg.includes("network")
+          err instanceof LiveKitConfigError ||
+          err.name === "LiveKitConfigError" ||
+          err.message.includes("LiveKit configuration error")
         ) {
-          connMsg =
-            "Cannot connect to LiveKit media server (ws://localhost:7880). Please ensure livekit-server is running.";
-        } else {
           connMsg = err.message;
+        } else {
+          const msg = err.message.toLowerCase();
+          if (
+            msg.includes("connect") ||
+            msg.includes("websocket") ||
+            msg.includes("failed to fetch") ||
+            msg.includes("refused") ||
+            msg.includes("network")
+          ) {
+            const isDev = process.env.NODE_ENV !== "production";
+            connMsg = isDev
+              ? `Cannot connect to LiveKit media server (${targetUrl || "ws://localhost:7880"}). Please ensure livekit-server is running.`
+              : `Cannot connect to LiveKit media server (${targetUrl || "configured server"}). Please check network connectivity and server status.`;
+          } else {
+            connMsg = err.message;
+          }
         }
       }
 
@@ -515,6 +627,7 @@ export class LiveKitCallManager {
           : new Error(connMsg);
 
       this.notifyError(error);
+      throw error;
     }
   }
 
@@ -529,12 +642,18 @@ export class LiveKitCallManager {
     try {
       const current = this.room.localParticipant.isMicrophoneEnabled;
       const target = !current;
-      await this.room.localParticipant.setMicrophoneEnabled(target);
+      
+      // Optimistic UI update for instant feedback
       this.setMediaState({ isMicEnabled: target });
+      
+      await this.room.localParticipant.setMicrophoneEnabled(target);
       return target;
     } catch (err) {
       console.error("[LiveKitCallManager] toggleMicrophone error:", err);
-      return this.mediaState.isMicEnabled;
+      // Revert on failure
+      const current = this.room.localParticipant.isMicrophoneEnabled;
+      this.setMediaState({ isMicEnabled: current });
+      return current;
     }
   }
 
@@ -554,16 +673,24 @@ export class LiveKitCallManager {
     try {
       const current = this.room.localParticipant.isCameraEnabled;
       const target = !current;
-      await this.room.localParticipant.setCameraEnabled(target);
+      
+      // Optimistic UI update for instant feedback
       this.setMediaState({ isCameraEnabled: target });
+      
+      await this.room.localParticipant.setCameraEnabled(target);
       return target;
     } catch (err) {
       console.error("[LiveKitCallManager] toggleCamera error:", err);
-      return this.mediaState.isCameraEnabled;
+      // Revert on failure
+      const current = this.room.localParticipant.isCameraEnabled;
+      this.setMediaState({ isCameraEnabled: current });
+      return current;
     }
   }
 
-  /** Switch between available front/back camera devices during a video call. */
+  /**
+   * Switch front/back camera (if multiple video inputs exist)
+   */
   public async switchCamera(): Promise<boolean> {
     if (this.currentCallType !== "VIDEO" || !this.room || this.connectionState !== "CONNECTED") {
       return false;
@@ -575,15 +702,65 @@ export class LiveKitCallManager {
       );
       if (devices.length < 2) return false;
 
-      const publication = this.room.localParticipant.getTrackPublication(Track.Source.Camera);
-      const currentDeviceId = publication?.track?.mediaStreamTrack?.getSettings().deviceId;
-      const currentIndex = devices.findIndex((device) => device.deviceId === currentDeviceId);
-      const nextDevice = devices[(currentIndex + 1) % devices.length];
+      const currentDeviceId = this.room.getActiveDevice("videoinput");
+      let nextDevice = devices[0];
+      
+      if (currentDeviceId) {
+        const currentIndex = devices.findIndex((device) => device.deviceId === currentDeviceId);
+        if (currentIndex !== -1) {
+          nextDevice = devices[(currentIndex + 1) % devices.length];
+        } else {
+          nextDevice = devices[1]; // fallback if current not found in list
+        }
+      } else {
+        // If we don't know the current, try the last one (often the back camera)
+        nextDevice = devices[devices.length - 1];
+      }
 
       await this.room.switchActiveDevice("videoinput", nextDevice.deviceId);
       return true;
     } catch (err) {
       console.error("[LiveKitCallManager] switchCamera error:", err);
+      return false;
+    }
+  }
+
+  /**
+   * Toggle between Loudspeaker and Earpiece (if supported)
+   */
+  public async toggleSpeaker(): Promise<boolean> {
+    if (!this.room) return false;
+    try {
+      const currentState = this.mediaState.isSpeakerEnabled ?? false;
+      const newState = !currentState;
+      
+      // Optimistic UI update
+      this.setMediaState({ isSpeakerEnabled: newState });
+
+      const devices = (await navigator.mediaDevices.enumerateDevices()).filter(
+        (device) => device.kind === "audiooutput",
+      );
+
+      if (devices.length > 1) {
+        const currentDeviceId = this.room.getActiveDevice("audiooutput");
+        let targetDevice = devices[0];
+        
+        if (currentDeviceId) {
+           const currentIndex = devices.findIndex(d => d.deviceId === currentDeviceId);
+           if (currentIndex !== -1) {
+              targetDevice = devices[(currentIndex + 1) % devices.length];
+           }
+        }
+        await this.room.switchActiveDevice("audiooutput", targetDevice.deviceId);
+      } else {
+        console.warn("[LiveKitCallManager] Only 1 audio output device found, cannot toggle speaker programmatically via standard WebRTC.");
+      }
+      
+      return true;
+    } catch (err) {
+      console.error("[LiveKitCallManager] toggleSpeaker error:", err);
+      // Revert on error
+      this.setMediaState({ isSpeakerEnabled: !this.mediaState.isSpeakerEnabled });
       return false;
     }
   }
@@ -722,6 +899,7 @@ export class LiveKitCallManager {
       isAudioPlaybackBlocked: false,
       isLocalSpeaking: false,
       isRemoteSpeaking: false,
+      isSpeakerEnabled: false,
     });
 
     this.notifyError(null);

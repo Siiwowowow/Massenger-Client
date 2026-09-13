@@ -7,7 +7,41 @@ export interface RequestCallTokenOptions {
   userId?: string;
 }
 
+export interface StartCallResult {
+  isBusy: boolean;
+  callId?: string;
+  conversationId: string;
+  receiverId?: string;
+  receiverOnline?: boolean;
+}
+
 export const callService = {
+  async startCall(options: {
+    conversationId: string;
+    callType: "AUDIO" | "VIDEO";
+    userId?: string;
+  }): Promise<StartCallResult> {
+    const response = await httpClient.post<{ data?: StartCallResult }>(
+      "/calls/start",
+      { conversationId: options.conversationId, callType: options.callType },
+      { headers: options.userId ? { "x-user-id": options.userId } : undefined }
+    );
+    const raw = response as unknown as { data?: StartCallResult } | StartCallResult;
+    return (raw as { data?: StartCallResult }).data || (raw as StartCallResult);
+  },
+
+  async isUserOnline(userId: string): Promise<boolean> {
+    try {
+      const response = await httpClient.get<{ data?: { isOnline?: boolean } }>(
+        `/communication-users/${userId}/presence`
+      );
+      const raw = response as unknown as { data?: { isOnline?: boolean } };
+      return Boolean(raw?.data?.isOnline);
+    } catch {
+      return false;
+    }
+  },
+
   /**
    * Request a LiveKit call token from backend for the given conversation.
    * Architecture-ready for upcoming LiveKit media connection phase.

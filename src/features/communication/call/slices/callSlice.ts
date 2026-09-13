@@ -62,11 +62,25 @@ export const callSlice = createSlice({
       }
       state.callState = "RINGING_OUTGOING";
       state.statusMessage = "Ringing...";
+      if (state.activeCall) state.activeCall.statusText = "Ringing...";
+    },
+
+    setOutgoingCallId: (
+      state,
+      action: PayloadAction<{ callId: string; conversationId?: string }>
+    ) => {
+      if (state.activeCall) {
+        state.activeCall.callId = action.payload.callId;
+        if (action.payload.conversationId) {
+          state.activeCall.conversationId = action.payload.conversationId;
+        }
+        state.activeCall.statusText = "Calling...";
+      }
     },
 
     setIncomingCall: (state, action: PayloadAction<CallIncomingPayload>) => {
       state.callState = "RINGING_INCOMING";
-      state.statusMessage = `Incoming ${action.payload.callType.toLowerCase()} call`;
+      state.statusMessage = `${action.payload.caller.name} is calling you`;
       state.error = null;
       state.activeCall = {
         callId: action.payload.callId,
@@ -74,7 +88,7 @@ export const callSlice = createSlice({
         callType: action.payload.callType,
         caller: action.payload.caller,
         receiver: null,
-        statusText: `Incoming ${action.payload.callType.toLowerCase()} call`,
+        statusText: `${action.payload.caller.name} is calling you`,
       };
     },
 
@@ -167,6 +181,7 @@ export const callSlice = createSlice({
 export const {
   initiateOutgoingCall,
   setOutgoingRinging,
+  setOutgoingCallId,
   setIncomingCall,
   setCallAccepted,
   setCallRejected,

@@ -1,6 +1,9 @@
-// test/call-livekit-phase-3.test.ts
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { LiveKitCallManager } from "../src/features/communication/call/services/livekit-call-manager";
+import {
+  LiveKitCallManager,
+  LiveKitConfigError,
+  resolveLiveKitServerUrl,
+} from "../src/features/communication/call/services/livekit-call-manager";
 import { callService } from "../src/features/communication/call/services/call.service";
 
 // Mock livekit-client
@@ -366,5 +369,155 @@ describe("Frontend Call Phase 3 — LiveKit Connection Foundation Tests", () => 
     expect(room?.disconnect).toHaveBeenCalled();
     expect(manager.getRoom()).toBeNull();
     expect(manager.getConnectionState()).toBe("DISCONNECTED");
+  });
+
+  // 11. Production: throws configuration error when serverUrl and NEXT_PUBLIC_LIVEKIT_URL are missing
+  it("11. Production: throws clear configuration error when serverUrl and env URL are missing", async () => {
+    requestCallTokenSpy.mockResolvedValueOnce({
+      token: "valid_token_prod",
+      serverUrl: "", // missing from backend
+      roomName: "room_prod_test",
+    });
+
+    const origEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+
+    try {
+      await expect(
+        manager.connect({
+          callId: "call_prod_missing",
+          conversationId: "conv_prod_1",
+          callState: "ACCEPTED",
+        })
+      ).rejects.toThrowError(LiveKitConfigError);
+
+      expect(manager.getConnectionState()).toBe("DISCONNECTED");
+      expect(manager.getMediaState().mediaErrorMessage).toContain(
+        "LiveKit server URL is missing"
+      );
+    } finally {
+      process.env.NODE_ENV = origEnv;
+    }
+  });
+
+  // 12. Production: disallows localhost URLs
+  it("12. Production: disallows localhost fallback or localhost URLs and throws LiveKitConfigError", async () => {
+    requestCallTokenSpy.mockResolvedValueOnce({
+      token: "valid_token_prod_localhost",
+      serverUrl: "ws://localhost:7880",
+      roomName: "room_prod_localhost",
+    });
+
+    const origEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+
+    try {
+      await expect(
+        manager.connect({
+          callId: "call_prod_localhost",
+          conversationId: "conv_prod_2",
+          callState: "ACCEPTED",
+        })
+      ).rejects.toThrow(/Localhost or insecure URL/);
+    } finally {
+      process.env.NODE_ENV = origEnv;
+    }
+  });
+
+  // 13. Production: connects when a valid production URL is returned
+  it("13. Production: connects successfully when a valid production URL is provided", async () => {
+    const prodUrl = "wss://custom-sfu.messenger.io:7880";
+    requestCallTokenSpy.mockResolvedValueOnce({
+      token: "valid_token_prod_success",
+      serverUrl: prodUrl,
+      roomName: "room_prod_success",
+    });
+
+    const origEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+
+    try {
+      await manager.connect({
+        callId: "call_prod_success",
+        conversationId: "conv_prod_3",
+        callState: "ACCEPTED",
+      });
+
+      expect(manager.getConnectionState()).toBe("CONNECTED");
+      const room = manager.getRoom();
+      expect(room?.connect).toHaveBeenCalledWith(
+        prodUrl,
+        "valid_token_prod_success",
+        expect.anything()
+      );
+    } finally {
+      process.env.NODE_ENV = origEnv;
+    }
+  });
+
+  // 14. Development: allows localhost and falls back to ws://localhost:7880
+  it("14. Development: allows localhost and falls back to ws://localhost:7880 when missing", async () => {
+    requestCallTokenSpy.mockResolvedValueOnce({
+      token: "valid_token_dev",
+      serverUrl: "", // missing from backend
+      roomName: "room_dev_test",
+    });
+
+    const origEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "development";
+
+    try {
+      await manager.connect({
+        callId: "call_dev_missing",
+        conversationId: "conv_dev_1",
+        callState: "ACCEPTED",
+      });
+
+      expect(manager.getConnectionState()).toBe("CONNECTED");
+      const room = manager.getRoom();
+      expect(room?.connect).toHaveBeenCalledWith(
+        "ws://localhost:7880",
+        "valid_token_dev",
+        expect.anything()
+      );
+    } finally {
+      process.env.NODE_ENV = origEnv;
+    }
+  });
+
+  // 15. Standalone resolveLiveKitServerUrl helper tests
+  it("15. resolveLiveKitServerUrl enforces development vs production environment constraints", () => {
+    // Production: missing both throws
+    expect(() => resolveLiveKitServerUrl("", "", "production")).toThrowError(
+      LiveKitConfigError
+    );
+    expect(() => resolveLiveKitServerUrl(undefined, undefined, "production")).toThrowError(
+      /LiveKit server URL is missing/
+    );
+
+    // Production: localhost disallowed
+    expect(() =>
+      resolveLiveKitServerUrl("ws://localhost:7880", undefined, "production")
+    ).toThrowError(/Localhost or insecure URL/);
+    expect(() =>
+      resolveLiveKitServerUrl(undefined, "http://127.0.0.1:7880", "production")
+    ).toThrowError(/Localhost or insecure URL/);
+
+    // Production: valid cloud / domain URL allowed
+    expect(
+      resolveLiveKitServerUrl(
+        "wss://massenger-sfu.livekit.cloud",
+        undefined,
+        "production"
+      )
+    ).toBe("wss://massenger-sfu.livekit.cloud");
+
+    // Development: missing defaults to localhost:7880
+    expect(resolveLiveKitServerUrl("", "", "development")).toBe(
+      "ws://localhost:7880"
+    );
+    expect(
+      resolveLiveKitServerUrl("ws://localhost:7880", undefined, "development")
+    ).toBe("ws://localhost:7880");
   });
 });

@@ -98,8 +98,9 @@ export function OutgoingCallDialog({
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent
         showCloseButton={false}
-        className="max-w-sm sm:max-w-md w-[92vw] bg-[#111b21] text-white border-[#222e35] p-6 sm:p-8 rounded-3xl shadow-2xl flex flex-col items-center text-center overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        className="max-w-sm sm:max-w-md w-[92vw] bg-linear-to-b from-[#1a2328] to-[#111b21] text-white border border-[#2a363d]/50 p-6 sm:p-8 rounded-[2rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.8)] flex flex-col items-center text-center overflow-hidden animate-in fade-in zoom-in-95 duration-300"
       >
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-[#9ef01a]/10 via-transparent to-transparent pointer-events-none" />
         <DialogTitle className="sr-only">
           Calling {calleeName} ({isVideo ? "Video" : "Audio"})
         </DialogTitle>
@@ -108,18 +109,18 @@ export function OutgoingCallDialog({
         </DialogDescription>
 
         {/* Top Call Type Badge */}
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-xs font-semibold text-slate-200 tracking-wide mb-5">
+        <div className="z-10 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-semibold text-slate-200 tracking-wide mb-6 shadow-sm backdrop-blur-md">
           {isVideo ? (
-            <Video className="w-3.5 h-3.5 text-[#9ef01a]" />
+            <Video className="w-3.5 h-3.5 text-[#9ef01a] animate-pulse" />
           ) : (
-            <Phone className="w-3.5 h-3.5 text-[#9ef01a]" />
+            <Phone className="w-3.5 h-3.5 text-[#9ef01a] animate-pulse" />
           )}
           <span>OUTGOING {isVideo ? "VIDEO" : "AUDIO"} CALL</span>
         </div>
 
         {/* Local camera preview while the other participant is being notified */}
         {isVideo ? (
-          <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-slate-950 shadow-inner my-2">
+          <div className="z-10 relative aspect-3/4 sm:aspect-square w-full sm:w-[85%] mx-auto overflow-hidden rounded-3xl border border-white/10 bg-slate-950 shadow-inner my-2">
             {isPreviewReady ? (
               <video
                 ref={previewRef}
@@ -130,28 +131,30 @@ export function OutgoingCallDialog({
                 aria-label="Your camera preview"
               />
             ) : (
-              <div className="flex h-full flex-col items-center justify-center gap-3 p-6">
+              <div className="flex h-full flex-col items-center justify-center gap-3 p-6 bg-slate-900/50 backdrop-blur-sm">
                 <CallAvatar name="You" size="lg" isPulsing={!previewError} />
-                <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/40 px-3 py-1.5 text-xs text-slate-300">
-                  <VideoOff className="h-3.5 w-3.5 text-slate-400" />
+                <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/40 px-4 py-2 text-xs text-slate-300 backdrop-blur-md">
+                  <VideoOff className="h-4 w-4 text-slate-400" />
                   <span>{previewError ? "Camera permission is required" : "Starting camera..."}</span>
                 </div>
               </div>
             )}
 
-            <div className="absolute inset-x-3 bottom-3 flex items-end justify-between gap-3">
-              <div className="rounded-full bg-black/60 px-3 py-1.5 text-left text-xs text-white backdrop-blur-sm">
-                <span className="font-medium">You</span>
-                <span className="ml-2 text-slate-300">Camera preview</span>
+            <div className="absolute inset-x-4 bottom-4 flex items-end justify-between gap-3">
+              <div className="rounded-full bg-black/50 border border-white/10 px-3 py-1.5 text-left text-xs text-white backdrop-blur-md shadow-lg">
+                <span className="font-medium text-[#9ef01a]">You</span>
               </div>
-              <div className="rounded-full bg-black/60 px-3 py-1.5 text-xs text-slate-200 backdrop-blur-sm">
-                Waiting for {calleeName}
+              <div className="rounded-full bg-black/50 border border-white/10 px-3 py-1.5 text-xs text-slate-200 backdrop-blur-md shadow-lg flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-[#9ef01a] animate-pulse" />
+                Waiting...
               </div>
             </div>
           </div>
         ) : (
           /* Audio Mode Pulsing Avatar */
-          <div className="my-3">
+          <div className="z-10 my-4 relative">
+            <div className="absolute inset-0 rounded-full animate-ping bg-[#9ef01a]/20 scale-150" />
+            <div className="absolute inset-0 rounded-full animate-pulse bg-[#9ef01a]/30 scale-125" />
             <CallAvatar
               name={calleeName}
               avatarUrl={calleeAvatar}
@@ -162,15 +165,16 @@ export function OutgoingCallDialog({
         )}
 
         {/* Callee Identity & Calling State */}
-        <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight mt-3">
+        <h2 className="z-10 text-2xl sm:text-3xl font-bold text-white tracking-tight mt-6">
           {calleeName}
         </h2>
-        <p className="text-xs sm:text-sm text-slate-400 mt-1 animate-pulse">
-          Calling...
+        <p className="z-10 text-sm sm:text-base text-slate-400 mt-2 font-medium flex items-center gap-2">
+          {activeCall.statusText || "Calling..."} {calleeName}
+          <span className="flex gap-0.5"><span className="animate-bounce delay-75">.</span><span className="animate-bounce delay-150">.</span><span className="animate-bounce delay-300">.</span></span>
         </p>
 
         {/* Cancel Action */}
-        <div className="w-full mt-6">
+        <div className="z-10 w-full mt-8 sm:mt-10">
           <CallControls mode="outgoing" onCancel={handleCancel} />
         </div>
       </DialogContent>

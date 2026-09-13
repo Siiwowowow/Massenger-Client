@@ -17,7 +17,8 @@ const clientEnvSchema = z.object({
     .default("http://localhost:5000"),
   NEXT_PUBLIC_LIVEKIT_URL: z
     .string()
-    .default("ws://localhost:7880"),
+    .optional()
+    .transform((val) => val?.trim() || ""),
 });
 
 const serverEnvSchema = z.object({

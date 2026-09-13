@@ -16,6 +16,7 @@ import {
   PaginatedMessages,
   IPresence,
   ConversationJoinSuccessData,
+  RealtimeAckResponse,
 } from "../types/communication.types";
 
 interface UseMessagesProps {
@@ -49,15 +50,44 @@ export function useMessages({
       if (!conversationId) {
         return { items: [], nextCursor: null, hasMore: false };
       }
-      return communicationService.getMessages(conversationId, {
+      const page = await communicationService.getMessages(conversationId, {
         limit: 30,
         cursor: pageParam,
       });
+
+      // Keep locally sending messages visible while a polling response catches up.
+      if (pageParam !== undefined) return page;
+
+      const cached = queryClient.getQueryData<InfiniteData<PaginatedMessages>>([
+        "messages",
+        conversationId,
+      ]);
+      const serverKeys = new Set(
+        page.items.flatMap((message) => [message.id, message.clientMessageId].filter(Boolean))
+      );
+      const pendingMessages = cached?.pages
+        .flatMap((cachedPage) => cachedPage.items)
+        .filter(
+          (message) =>
+            message.isSending &&
+            Boolean(message.clientMessageId) &&
+            !serverKeys.has(message.clientMessageId as string)
+        ) ?? [];
+
+      return pendingMessages.length
+        ? { ...page, items: [...page.items, ...pendingMessages] }
+        : page;
     },
     initialPageParam: undefined,
     getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.nextCursor ?? undefined : undefined),
     enabled: Boolean(conversationId),
     staleTime: 30000,
+    // Vercel serverless deployments cannot keep a Socket.IO connection alive.
+    // Keep the REST fallback fast enough for messages to appear without reload.
+    refetchInterval: conversationId ? 1000 : false,
+    refetchIntervalInBackground: false,
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: true,
     retry: (failureCount, err: any) => {
       if (
         err?.status === 403 ||
@@ -505,12 +535,42 @@ export function useMessages({
       try {
         if (socket && socket.connected) {
           // Send via Socket.IO
-          await socketClient.emitWithAck(REALTIME_EVENTS.CLIENT.MESSAGE_SEND, {
-            conversationId,
-            content: content.trim(),
-            type: "TEXT",
-            clientMessageId,
-          });
+          const ack = await socketClient.emitWithAck<RealtimeAckResponse<IMessage>>(
+            REALTIME_EVENTS.CLIENT.MESSAGE_SEND,
+            {
+              conversationId,
+              content: content.trim(),
+              type: "TEXT",
+              clientMessageId,
+            }
+          );
+
+          if (!ack?.success) {
+            throw new Error(
+              typeof ack?.error?.message === "string"
+                ? ack.error.message
+                : "Message was not sent"
+            );
+          }
+
+          const sentMessage = ack.data;
+          queryClient.setQueryData<InfiniteData<PaginatedMessages>>(
+            ["messages", conversationId],
+            (old) => {
+              if (!old) return old;
+              return {
+                ...old,
+                pages: old.pages.map((page) => ({
+                  ...page,
+                  items: page.items.map((message) =>
+                    message.clientMessageId === clientMessageId
+                      ? sentMessage ?? { ...message, isSending: false, status: "SENT" }
+                      : message
+                  ),
+                })),
+              };
+            }
+          );
         } else {
           // Fallback to REST
           const sent = await communicationService.sendMessage(conversationId, {

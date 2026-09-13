@@ -120,6 +120,31 @@ class SocketClientManager {
     return Boolean(this.socket?.connected);
   }
 
+  public async waitForConnection(timeoutMs = 8000): Promise<boolean> {
+    if (this.socket?.connected) return true;
+    const socket = this.socket;
+    if (!socket) return false;
+
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (connected: boolean) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        socket.off("connect", handleConnect);
+        socket.off("connect_error", handleError);
+        resolve(connected);
+      };
+      const handleConnect = () => finish(true);
+      const handleError = () => finish(false);
+      const timer = setTimeout(() => finish(false), timeoutMs);
+
+      socket.once("connect", handleConnect);
+      socket.once("connect_error", handleError);
+      socket.connect();
+    });
+  }
+
   /**
    * Disconnect and cleanup active socket
    */

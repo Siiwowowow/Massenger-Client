@@ -101,9 +101,6 @@ export function usePresence() {
 
   // Listen to realtime presence updates (presence:online and presence:offline)
   useEffect(() => {
-    const socket = socketClient.getSocket();
-    if (!socket) return;
-
     const handleOnline = (payload: { userId: string; isOnline: boolean }) => {
       if (!payload || !payload.userId) return;
       setPresenceMap((prev) => ({
@@ -132,12 +129,32 @@ export function usePresence() {
       }));
     };
 
-    socket.on(REALTIME_EVENTS.SERVER.PRESENCE_ONLINE, handleOnline);
-    socket.on(REALTIME_EVENTS.SERVER.PRESENCE_OFFLINE, handleOffline);
+    let activeSocket = socketClient.getSocket();
+    let listenersAttached = false;
+
+    const attachListeners = () => {
+      const socket = socketClient.getSocket();
+      if (!socket || listenersAttached) return;
+
+      activeSocket = socket;
+      socket.on(REALTIME_EVENTS.SERVER.PRESENCE_ONLINE, handleOnline);
+      socket.on(REALTIME_EVENTS.SERVER.PRESENCE_OFFLINE, handleOffline);
+      listenersAttached = true;
+    };
+
+    attachListeners();
+    const unsubscribe = socketClient.onStatusChange((status) => {
+      if (status === "connected" || status === "connecting") {
+        attachListeners();
+      }
+    });
 
     return () => {
-      socket.off(REALTIME_EVENTS.SERVER.PRESENCE_ONLINE, handleOnline);
-      socket.off(REALTIME_EVENTS.SERVER.PRESENCE_OFFLINE, handleOffline);
+      unsubscribe();
+      if (listenersAttached && activeSocket) {
+        activeSocket.off(REALTIME_EVENTS.SERVER.PRESENCE_ONLINE, handleOnline);
+        activeSocket.off(REALTIME_EVENTS.SERVER.PRESENCE_OFFLINE, handleOffline);
+      }
     };
   }, []);
 

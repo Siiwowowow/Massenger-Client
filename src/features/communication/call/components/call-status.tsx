@@ -99,7 +99,7 @@ export function CallStatus({
     if (state === "RINGING_OUTGOING") {
       return (
         <span className="text-sm font-medium text-slate-300 animate-pulse">
-          Calling...
+          {statusMessage || "Calling..."}
         </span>
       );
     }

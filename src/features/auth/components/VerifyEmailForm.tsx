@@ -74,7 +74,7 @@ async function verifyEmailAction(payload: { email: string; otp: string }) {
 
 async function resendOtpAction(email: string) {
   try {
-    const res = await fetch(`${BASE_API_URL}/auth/forget-password`, {
+    const res = await fetch(`${BASE_API_URL}/auth/resend-verification-otp`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

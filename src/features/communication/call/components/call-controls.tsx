@@ -3,7 +3,7 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff } from "lucide-react";
+import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, SwitchCamera, Volume2, Volume1 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CallType } from "../types/call.types";
 
@@ -12,12 +12,15 @@ interface CallControlsProps {
   callType?: CallType;
   isMicEnabled?: boolean;
   isCameraEnabled?: boolean;
+  isSpeakerEnabled?: boolean;
   onAccept?: () => void;
   onReject?: () => void;
   onCancel?: () => void;
   onEnd?: () => void;
   onToggleMic?: () => void;
   onToggleCamera?: () => void;
+  onToggleSpeaker?: () => void;
+  onSwitchCamera?: () => void;
   disabled?: boolean;
   className?: string;
 }
@@ -27,12 +30,15 @@ export function CallControls({
   callType,
   isMicEnabled = true,
   isCameraEnabled = true,
+  isSpeakerEnabled = false,
   onAccept,
   onReject,
   onCancel,
   onEnd,
   onToggleMic,
   onToggleCamera,
+  onToggleSpeaker,
+  onSwitchCamera,
   disabled = false,
   className,
 }: CallControlsProps) {
@@ -114,7 +120,7 @@ export function CallControls({
   return (
     <div
       className={cn(
-        "flex items-center justify-center gap-4 sm:gap-6 py-3 px-6 bg-slate-900/80 backdrop-blur-md rounded-3xl border border-white/10 shadow-2xl",
+        "flex items-center justify-center gap-2 sm:gap-6 py-2 sm:py-3 px-3 sm:px-6 bg-slate-900/80 backdrop-blur-md rounded-full border border-white/10 shadow-2xl",
         className
       )}
     >
@@ -126,16 +132,16 @@ export function CallControls({
         aria-label={isMicEnabled ? "Mute microphone" : "Unmute microphone"}
         title={isMicEnabled ? "Mute microphone" : "Unmute microphone"}
         className={cn(
-          "w-12 h-12 rounded-full flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9ef01a]",
+          "w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center transition-all duration-300 ease-out cursor-pointer hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9ef01a]",
           isMicEnabled
-            ? "bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white"
-            : "bg-rose-500/25 hover:bg-rose-500/35 text-rose-400 border border-rose-500/40"
+            ? "bg-slate-700/50 hover:bg-slate-600/70 text-white backdrop-blur-md border border-white/10"
+            : "bg-white text-slate-900 shadow-lg shadow-white/20 border border-white"
         )}
       >
         {isMicEnabled ? (
-          <Mic className="w-5 h-5 stroke-2" />
+          <Mic className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.8]" />
         ) : (
-          <MicOff className="w-5 h-5 stroke-[2.2]" />
+          <MicOff className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.2]" />
         )}
       </button>
 
@@ -149,15 +155,56 @@ export function CallControls({
             aria-label={isCameraEnabled ? "Turn off camera" : "Turn on camera"}
             title={isCameraEnabled ? "Turn off camera" : "Turn on camera"}
             className={cn(
-              "w-12 h-12 rounded-full flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9ef01a]",
+              "w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center transition-all duration-300 ease-out cursor-pointer hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9ef01a]",
               isCameraEnabled
-                ? "bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white"
-                : "bg-rose-500/25 hover:bg-rose-500/35 text-rose-400 border border-rose-500/40"
+                ? "bg-slate-700/50 hover:bg-slate-600/70 text-white backdrop-blur-md border border-white/10"
+                : "bg-white text-slate-900 shadow-lg shadow-white/20 border border-white"
             )}
           >
-            {isCameraEnabled ? <Video className="w-5 h-5 stroke-2" /> : <VideoOff className="w-5 h-5 stroke-[2.2]" />}
+            {isCameraEnabled ? <Video className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.8]" /> : <VideoOff className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.2]" />}
           </button>
+
+          {/* Switch Camera Button */}
+          {onSwitchCamera && (
+            <button
+              type="button"
+              onClick={onSwitchCamera}
+              disabled={disabled || !isCameraEnabled}
+              aria-label="Switch camera"
+              title="Switch camera"
+              className={cn(
+                "w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center transition-all duration-300 ease-out cursor-pointer hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9ef01a]",
+                "bg-slate-700/50 hover:bg-slate-600/70 text-white backdrop-blur-md border border-white/10",
+                (!isCameraEnabled || disabled) && "opacity-50 cursor-not-allowed hover:scale-100"
+              )}
+            >
+              <SwitchCamera className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.8]" />
+            </button>
+          )}
         </>
+      )}
+
+      {/* Speaker Toggle Button */}
+      {onToggleSpeaker && (
+        <button
+          type="button"
+          onClick={onToggleSpeaker}
+          disabled={disabled}
+          aria-label={isSpeakerEnabled ? "Speaker on" : "Speaker off"}
+          title={isSpeakerEnabled ? "Speaker on" : "Speaker off"}
+          className={cn(
+            "w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center transition-all duration-300 ease-out cursor-pointer hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9ef01a]",
+            isSpeakerEnabled
+              ? "bg-white text-slate-900 shadow-lg shadow-white/20 border border-white"
+              : "bg-slate-700/50 hover:bg-slate-600/70 text-white backdrop-blur-md border border-white/10"
+          )}
+        >
+          {isSpeakerEnabled ? (
+            <Volume2 className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.8]" />
+          ) : (
+            <Volume1 className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.2]" />
+          )}
+        </button>
       )}
 
       {/* End Call Button */}
@@ -167,9 +214,9 @@ export function CallControls({
         disabled={disabled}
         aria-label="End call"
         title="End call"
-        className="w-13 h-13 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center shadow-lg transition-transform hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 cursor-pointer"
+        className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center shadow-[0_0_20px_rgba(225,29,72,0.4)] transition-all duration-300 ease-out hover:scale-110 active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-rose-400 cursor-pointer ml-1 sm:ml-4"
       >
-        <PhoneOff className="w-6 h-6 stroke-[2.2]" />
+        <PhoneOff className="w-6 h-6 sm:w-8 sm:h-8 stroke-[2.2]" />
       </button>
     </div>
   );

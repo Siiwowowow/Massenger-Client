@@ -121,6 +121,9 @@ export function CommunicationLayout({ className }: CommunicationLayoutProps = {}
     isCameraEnabled,
     toggleMic,
     toggleCamera,
+    toggleSpeaker,
+    isSpeakerEnabled,
+    switchCamera,
     disconnect: disconnectLiveKit,
     startAudio,
   } = useLiveKitCall({
@@ -179,6 +182,10 @@ export function CommunicationLayout({ className }: CommunicationLayoutProps = {}
   useEffect(() => {
     if (activeConversationId) {
       fetchConversationPresence(activeConversationId);
+      const interval = window.setInterval(() => {
+        fetchConversationPresence(activeConversationId);
+      }, 5000);
+      return () => window.clearInterval(interval);
     }
   }, [activeConversationId, fetchConversationPresence]);
 
@@ -527,7 +534,6 @@ export function CommunicationLayout({ className }: CommunicationLayoutProps = {}
                 editingMessage={editingMessage}
                 onCancelEdit={handleCancelEdit}
                 onTyping={handleUserTyping}
-                disabled={connectionStatus === "disconnected"}
               />
             </>
           ) : (
@@ -611,6 +617,7 @@ export function CommunicationLayout({ className }: CommunicationLayoutProps = {}
           room={room}
           isMicEnabled={isMicEnabled}
           isCameraEnabled={isCameraEnabled}
+          isSpeakerEnabled={isSpeakerEnabled}
           mediaErrorMessage={mediaState.mediaErrorMessage}
           isAudioPlaybackBlocked={mediaState.isAudioPlaybackBlocked}
           isLocalSpeaking={mediaState.isLocalSpeaking}
@@ -618,6 +625,8 @@ export function CommunicationLayout({ className }: CommunicationLayoutProps = {}
           onStartAudio={startAudio}
           onToggleMic={toggleMic}
           onToggleCamera={toggleCamera}
+          onToggleSpeaker={toggleSpeaker}
+          onSwitchCamera={switchCamera}
           onEndCall={(callId) => {
             disconnectLiveKit();
             endCall(callId);
